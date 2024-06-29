@@ -8,21 +8,6 @@ The `npsd` crate provides a flexible and efficient way to serialize and deserial
 - Support for custom serialization contexts.
 - Middleware support for extensible processing during serialization/deserialization.
 
-## Usage
-
-Add this to your `Cargo.toml`:
-
-```toml
-[dependencies]
-npsd = "0.1.0"
-```
-
-Then include it in your crate:
-
-```rust
-extern crate npsd;
-```
-
 ## Traits
 
 ### `PayloadContext`
