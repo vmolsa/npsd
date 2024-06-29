@@ -2,6 +2,14 @@
 name = "npsd"
 version = "0.1.0"
 edition = "2021"
+license = "Apache-2.0"
+publish = true
+description = "Network payload serializer / deserializer framework"
+repository = "https://github.com/vmolsa/npsd"
+documentation = "https://docs.rs/npsd"
+categories = ["network-programming"]
+keywords = ["serialize", "deserialize"]
+readme = "README.md"
 
 [dependencies]
 schema = { path = "derive" }
