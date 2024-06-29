@@ -297,4 +297,4 @@ use std::borrow::Cow;
 use middleware::tracing::TraceInfo;
 
 pub use error::Error;
-pub use schema::{Schema, Bitmap};
+pub use npsd_schema::{Schema, Bitmap};

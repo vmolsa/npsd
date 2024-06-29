@@ -1,4 +1,4 @@
-use schema::SchemaInternal as Schema;
+use npsd_schema::SchemaInternal as Schema;
 #[doc(hidden)]
 use thiserror::Error as AsError;
 
