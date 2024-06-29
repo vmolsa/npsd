@@ -12,10 +12,9 @@ keywords = ["serialize", "deserialize"]
 readme = "README.md"
 
 [dependencies]
-schema = { path = "derive" }
 thiserror = "1.0.61"
+schema = { path = "derive", version = "0.1.0" }
 xxhash-rust = { version = "0.8.10", features = ["xxh3", "const_xxh3"] }
-
 uuid = { version = "1.8.0", features = ["std", "v4", "v7"], optional = true }
 fxhash = { version = "0.2.1", optional = true }
 chrono = { version = "0.4.38", optional = true }
