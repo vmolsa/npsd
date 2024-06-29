@@ -1,0 +1,16 @@
+[package]
+name = "schema"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { version = "2.0.68", features = ["full"] }
+quote = "1.0.36"
+proc-macro2 = "1.0.86"
+
+[features]
+default = []
