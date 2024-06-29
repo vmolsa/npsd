@@ -4,7 +4,7 @@ use thiserror::Error as AsError;
 
 use crate::{PayloadContext, Middleware, PayloadInfo, IntoPayload, FromPayload, Payload, PayloadHandler, PayloadConstHash};
 
-#[derive(Schema, AsError, Debug)]
+#[derive(Schema, Clone, AsError, Debug)]
 pub enum Error {
     #[error("Invalid length: expected `{expected}`, found `{found}`")]
     InvalidLength {
