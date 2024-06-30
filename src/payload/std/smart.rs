@@ -1,4 +1,4 @@
-use std::{borrow::Cow, cell::{Cell, Ref, RefCell}, pin::Pin, ptr, rc::Rc, sync::{Arc, Weak}};
+use std::{borrow::Cow, cell::{Cell, Ref, RefCell, UnsafeCell}, pin::Pin, ptr, rc::Rc, sync::{Arc, Weak}};
 
 use super::{Error, Middleware, PayloadContext, PayloadHandler, PayloadInfo, Payload, IntoPayload, FromPayload, PayloadConstHash};
 
@@ -62,6 +62,30 @@ macro_rules! impl_payload_smart_slice_traits {
 impl_payload_smart_slice_traits!(Box, "Box<T>", "Box<[T]>");
 impl_payload_smart_slice_traits!(Arc, "Arc<T>", "Arc<[T]>");
 impl_payload_smart_slice_traits!(Rc, "Rc<T>", "Rc<[T]>");
+
+impl<'a, C: PayloadContext, T: IntoPayload<C> + PayloadInfo + Copy> IntoPayload<C> for UnsafeCell<T> {
+    #[inline]
+    fn into_payload<'b, M: Middleware>(&'b self, handler: &mut PayloadHandler<'_>, ctx: &mut C, next: &mut M) -> Result<(), Error> {
+        next.into_payload::<C, T>(unsafe { &*self.get() }, handler, ctx)
+    }
+}
+
+impl<'a, C: PayloadContext, T: FromPayload<'a, C> + PayloadInfo> FromPayload<'a, C> for UnsafeCell<T> {
+    #[inline]
+    fn from_payload<'b, M: Middleware>(handler: &'b mut PayloadHandler<'a>, ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
+        where 'a: 'b,
+    {
+        Ok(UnsafeCell::new(next.from_payload::<C, T>(handler, ctx)?))
+    }
+}
+
+impl<'a, C: PayloadContext, T: Payload<'a, C> + PayloadInfo + Copy> Payload<'a, C> for UnsafeCell<T> {}
+
+impl<T: PayloadInfo> PayloadInfo for UnsafeCell<T> {
+    const HASH: u64 = T::HASH;
+    const TYPE: &'static str = T::TYPE;
+    const SIZE: Option<usize> = T::SIZE;
+}
 
 impl<'a, C: PayloadContext, T: IntoPayload<C> + PayloadInfo + Copy> IntoPayload<C> for Cell<T> {
     #[inline]
