@@ -286,6 +286,8 @@ pub mod features;
 pub mod context;
 pub mod poll;
 
+pub use poll::*;
+
 #[doc(hidden)]
 pub use xxhash_rust::const_xxh3::xxh3_64 as PayloadConstHash;
 #[doc(hidden)]
