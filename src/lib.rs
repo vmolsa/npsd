@@ -136,7 +136,6 @@ pub trait Middleware {
             ::std::slice::from_raw_parts(slice.as_ptr() as *const T, len)
         })
     }
-            
 }
 
 /// The `IntoPayload` trait is used to convert a type into a payload of bytes.
@@ -285,6 +284,7 @@ pub mod error;
 pub mod payload;
 pub mod features;
 pub mod context;
+pub mod poll;
 
 #[doc(hidden)]
 pub use xxhash_rust::const_xxh3::xxh3_64 as PayloadConstHash;
