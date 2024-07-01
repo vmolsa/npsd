@@ -8,6 +8,14 @@ The `npsd` crate provides a flexible and efficient way to serialize and deserial
 - Support for custom serialization contexts.
 - Middleware support for extensible processing during serialization/deserialization.
 
+## Differences between `npsd` and `serde`
+
+- **Purpose**: `npsd` is designed specifically for network payload serialization and deserialization, offering efficient handling of byte streams for network transmission. `serde`, on the other hand, is a general-purpose serialization framework supporting multiple formats (JSON, XML, etc.).
+
+- **Custom Contexts**: `npsd` supports custom serialization contexts and middleware for extensible processing during serialization/deserialization, which is tailored for networked applications. `serde` focuses on format-agnostic serialization.
+
+- **Procedural Macros**: Both libraries provide procedural macros, but `npsd` includes specific macros (`Schema`, `Bitmap`) for network-related serialization scenarios.
+
 ## Traits
 
 ### `PayloadContext`
@@ -28,7 +36,11 @@ The `FromPayload` trait is used to convert a payload of bytes back into a type.
 
 ### `PayloadInfo`
 
-The `PayloadInfo` trait provides metadata about the payload.
+The `PayloadInfo` trait provides metadata about the payload. Here are the associated constants and their descriptions:
+
+- **`const HASH: u64`**: A constant hash value associated with the type. This hash is calculated using the type's string representation and provides a unique identifier for the payload type.
+- **`const TYPE: &'static str`**: A string representing the type of the payload. This is used to identify the payload type in a human-readable format.
+- **`const SIZE: Option<usize>`**: An optional constant representing the size of the payload. This can be used to specify a fixed size for the payload, if applicable.
 
 ### `Payload`
 
