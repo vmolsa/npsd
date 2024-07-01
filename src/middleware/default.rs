@@ -1,4 +1,6 @@
-use crate::{Error, FromPayload, IntoPayload, Middleware, PayloadContext, PayloadHandler, PayloadInfo};
+use std::task::{Context, Poll};
+
+use crate::{AsyncFromPayload, AsyncIntoPayload, AsyncMiddleware, Error, FromPayload, IntoPayload, Middleware, PayloadContext, PayloadHandler, PayloadInfo};
 
 /// A no-op implementation of the `Middleware` trait.
 ///
@@ -36,3 +38,28 @@ impl Middleware for () {
     }
 }
 
+impl AsyncMiddleware for () {
+    fn poll_into_payload<'a, S, C: PayloadContext, T: AsyncIntoPayload<S, C>>(
+        &mut self,
+        value: &T,
+        state: &mut S,
+        cx: &mut Context<'_>, 
+        handler: &mut PayloadHandler<'_>,
+        ctx: &mut C 
+    ) -> Poll<Result<(), Error>> {
+        value.poll_into_payload(state, cx, handler, ctx, self)
+    }
+            
+    fn poll_from_payload<'a, 'b, S, C: PayloadContext, T: AsyncFromPayload<'a, S, C>> (
+        &mut self, 
+        state: &mut S,
+        cx: &mut Context<'_>, 
+        handler: &'b mut PayloadHandler<'a>,
+        ctx: &mut C
+    ) -> Poll<Result<T, Error>>
+        where
+            'a: 'b
+    {
+        T::poll_from_payload(state, cx, handler, ctx, self)
+    }
+}
