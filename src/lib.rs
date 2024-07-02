@@ -12,7 +12,7 @@
 //!
 //! ## Example
 //! ```rust
-//! use npsd::{Payload, Schema};
+//! use npsd::{Payload, Schema, Next, Middleware};
 //!
 //! #[derive(Schema, PartialEq, Debug)]
 //! enum Animal {
@@ -24,118 +24,100 @@
 //!
 //! #[test]
 //! fn test_schema() {
+//!     // Create Middleware
+//!     let mut next = Next::default();
+//! 
 //!     // Create an instance of `Animal`.
 //!     let animal = Animal::Frog("Frog".to_string(), vec![12393818, -19383812, 11111, -1093838482]);
 //!
 //!     // Serialize the `animal` instance into a packet.
-//!     let serialized = animal.into_packet(&mut (), 1470).unwrap();
+//!     animal.into_packet(&mut (), &mut next).unwrap();
 //!
+//!     // Create copy of serialized data if needed
+//!     let _serialized = next.serialized();
+//! 
 //!     // Deserialize the packet back into an `Animal` instance.
-//!     let deserialized = Animal::from_packet(&mut (), serialized).unwrap();
+//!     let deserialized = Animal::from_packet(&mut (), &mut next).unwrap();
 //!
 //!     // Ensure the deserialized instance matches the original.
 //!     assert_eq!(deserialized, animal);
 //! }
 //! ```
 
-pub type PayloadHandler<'a> = ::std::borrow::Cow<'a, [u8]>;
-
-/// The `PayloadContext` trait provides a way to unwrap the context used in the payload processing.
-///
-/// # Associated Types
-/// - `Context`: The type of the context being unwrapped.
-///
-/// # Methods
-/// - `fn unwrap(&mut self) -> &Self::Context`:
-///     - Unwraps the context, returning a reference to it.
-pub trait PayloadContext {
-    type Context: ?Sized;
-
-    fn unwrap(&mut self) -> &Self::Context;
-}
-
 /// The `Middleware` trait defines methods for converting types to and from payloads of bytes.
 ///
 /// # Methods
-/// - `fn into_payload<C: PayloadContext, T: IntoPayload<C> + PayloadInfo>(
+/// - `fn into_payload<C, T: IntoPayload<C> + PayloadInfo>(
 ///       &mut self, 
 ///       value: &T, 
-///       handler: &mut PayloadHandler<'_>, 
 ///       ctx: &mut C
 ///   ) -> Result<(), Error>`:
 ///     - Converts a value into a payload of bytes. This method takes a value and a context, 
 ///       serializes the value into a byte stream, and writes the resulting bytes into the handler.
-/// - `fn from_payload<'a, 'b, C: PayloadContext, T: FromPayload<'a, C> + PayloadInfo>(
+/// - `fn from_payload<'a, 'b, C, T: FromPayload<'a, C> + PayloadInfo>(
 ///       &mut self, 
-///       handler: &'b mut PayloadHandler<'a>, 
 ///       ctx: &mut C
 ///   ) -> Result<T, Error>`:
 ///     - Converts a payload of bytes back into a value. This method reads bytes from the handler,
 ///       uses the context to interpret them, and reconstructs the original value.
 /// - `fn write<T>(
 ///       &mut self, 
-///       handler: &mut PayloadHandler<'_>, 
 ///       data: &[T]
 ///   ) -> Result<(), Error>`:
 ///     - Writes raw data into the handler. This method takes a slice of data and appends it to the handler
 ///       after ensuring that the size of the data elements is 1 byte.
 /// - `fn read<'a, 'b, T>(
 ///       &'b mut self, 
-///       handler: &'b mut PayloadHandler<'a>, 
 ///       nbytes: usize
 ///   ) -> Result<&'a [T], Error>`:
 ///     - Reads raw data from the handler. This method reads a specified number of bytes from the handler,
 ///       splits the handler's data accordingly, and returns a slice of the read data.
 pub trait Middleware {
-    fn into_payload<C: PayloadContext, T: IntoPayload<C> + PayloadInfo>(&mut self, value: &T, handler: &mut PayloadHandler<'_>, ctx: &mut C) -> Result<(), Error>;
+    fn into_payload<C, T: IntoPayload<C> + PayloadInfo>(&mut self, value: &T, ctx: &mut C) -> Result<(), Error>;
             
-    fn from_payload<'a, 'b, C: PayloadContext, T: FromPayload<'a, C> + PayloadInfo>(&mut self, handler: &'b mut PayloadHandler<'a>, ctx: &mut C) -> Result<T, Error>
+    fn from_payload<'a, 'b, C, T: FromPayload<'a, C> + PayloadInfo>(&mut self, ctx: &mut C) -> Result<T, Error>
         where
             'a: 'b;
 
-    fn write<T>(&mut self, handler: &mut PayloadHandler<'_>, data: &[T]) -> Result<(), Error> {
-        debug_assert_eq!(::std::mem::size_of::<T>(), 1, "Size of T must be 1 byte");
+    fn write<T>(&mut self, data: &[T]) -> Result<(), Error>;
+    fn read<'a, 'b, T>(&'b mut self, nbytes: usize) -> Result<&'a [T], Error>;
     
-        let slice = unsafe {
-            ::std::slice::from_raw_parts(
-                data.as_ptr() as *const u8,
-                data.len() * ::std::mem::size_of::<T>(),
-            )
-        };
-        
-        handler.to_mut().extend_from_slice(slice);
-    
-        Ok(())
-    }
+    fn serialized(&self) -> Vec<u8>;
+}
 
-    fn read<'a, 'b, T>(&'b mut self, handler: &'b mut PayloadHandler<'a>, nbytes: usize) -> Result<&'a [T], Error> {
-        debug_assert_eq!(::std::mem::size_of::<T>(), 1, "Size of T must be 1 byte");
+/// The `AsyncMiddleware` trait extends `Middleware` with asynchronous methods
+/// for converting types to and from payloads of bytes.
+///
+/// # Methods
+/// - `fn poll_into_payload<'a, S, C, T: AsyncIntoPayload<S, C>>(
+///       &mut self,
+///       value: &T,
+///       state: &mut S,
+///       cx: &mut Context<'_>, 
+///       ctx: &mut C
+///   ) -> Poll<Result<(), Error>>`:
+///     - Polls the conversion of a value into a payload of bytes asynchronously.
+/// - `fn poll_from_payload<'a, 'b, S, C, T: AsyncFromPayload<'a, S, C>>(
+///       &mut self, 
+///       state: &mut S,
+///       cx: &mut Context<'_>, 
+///       ctx: &mut C,
+///   ) -> Poll<Result<T, Error>>`:
+///     - Polls the conversion of a payload of bytes back into a value asynchronously.
+pub trait AsyncMiddleware: Middleware {
+    fn poll_into_payload<'a, C, T: AsyncIntoPayload<C>>(
+        &mut self,
+        value: &T,
+        ctx: &mut C
+    ) -> impl Future<Output = Result<(), Error>>;
+            
+    fn poll_from_payload<'a, C, T: AsyncFromPayload<'a, C>> (
+        &mut self, 
+        ctx: &mut C,
+    ) -> impl Future<Output = Result<T, Error>>;
 
-        if handler.len() < nbytes {
-            return Err(Error::InvalidLength { expected: nbytes, found: handler.len() });
-        }
-    
-        let slice = match handler {
-            ::std::borrow::Cow::Borrowed(slice) => {
-                let (left, right) = slice.split_at(nbytes);
-                *handler = ::std::borrow::Cow::Borrowed(right);
-    
-                left
-            },
-            ::std::borrow::Cow::Owned(vec) => {
-                let right = vec.split_off(nbytes);
-                let left = ::std::mem::replace(vec, right);
-    
-                left.leak()
-            }
-        };
-
-        let len = slice.len() / ::std::mem::size_of::<T>();
-    
-        Ok(unsafe {
-            ::std::slice::from_raw_parts(slice.as_ptr() as *const T, len)
-        })
-    }
+    fn poll_write<T>(&mut self, data: &[T]) -> impl Future<Output = Result<(), Error>>;
+    fn poll_read<'a, 'b, T: 'a>(&'b mut self, nbytes: usize) -> impl Future<Output = Result<&'a [T], Error>>;
 }
 
 /// The `IntoPayload` trait is used to convert a type into a payload of bytes.
@@ -143,32 +125,60 @@ pub trait Middleware {
 /// # Methods
 /// - `fn into_payload<M: Middleware>(
 ///       &self, 
-///       handler: &mut PayloadHandler<'_>, 
 ///       ctx: &mut C, 
 ///       next: &mut M
 ///   ) -> Result<(), Error>`:
 ///     - Converts a value into a payload of bytes. This method takes the value, context, and middleware, 
 ///       serializes the value into a byte stream, and writes it into the handler.
-pub trait IntoPayload<C: PayloadContext> {
-    fn into_payload<M: Middleware>(&self, handler: &mut PayloadHandler<'_>, ctx: &mut C, next: &mut M) -> Result<(), Error>
-        where 
-            Self: IntoPayload<C>;
+pub trait IntoPayload<C> {
+    fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>;
+}
+
+/// The `AsyncIntoPayload` trait extends `IntoPayload` with asynchronous methods
+/// for converting types into payloads of bytes.
+///
+/// # Methods
+/// - `fn poll_into_payload<M: AsyncMiddleware>(
+///       &self, 
+///       state: &mut S, 
+///       cx: &mut Context<'_>, 
+///       ctx: &mut C, 
+///       next: &mut M
+///   ) -> Poll<Result<(), Error>>`:
+///     - Polls the conversion of a value into a payload of bytes asynchronously.
+pub trait AsyncIntoPayload<C>: IntoPayload<C> {
+    fn poll_into_payload<M: AsyncMiddleware>(&self, ctx: &mut C, next: &mut M) -> impl Future<Output = Result<(), Error>>;
 }
 
 /// The `FromPayload` trait is used to convert a payload of bytes back into a type.
 /// 
 /// # Methods
 /// - `fn from_payload<'b, M: Middleware>(
-///       handler: &'b mut PayloadHandler<'a>, 
 ///       ctx: &mut C, 
 ///       next: &'b mut M
 ///   ) -> Result<Self, Error>`:
 ///     - Converts a payload of bytes back into a value. This method reads bytes from the handler,
 ///       uses the context and middleware to interpret them, and reconstructs the original value.
-pub trait FromPayload<'a, C: PayloadContext>: Sized {
-    fn from_payload<'b, M: Middleware>(handler: &'b mut PayloadHandler<'a>, ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
+pub trait FromPayload<'a, C>: Sized {
+    fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
         where
-            Self: FromPayload<'a, C>,
+            'a: 'b;
+}
+
+/// The `AsyncFromPayload` trait extends `FromPayload` with asynchronous methods
+/// for converting payloads of bytes back into types.
+///
+/// # Methods
+/// - `fn poll_from_payload<'b, M: AsyncMiddleware>(
+///       state: &mut S, 
+///       cx: &mut Context<'_>, 
+///       ctx: &mut C, 
+///       next: &'b mut M
+///   ) -> Poll<Result<Self, Error>>`:
+///     - Polls the conversion of a payload of bytes back into a value asynchronously.
+pub trait AsyncFromPayload<'a, C>: FromPayload<'a, C> {
+    fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> impl Future<Output = Result<Self, Error>>
+        where
             'a: 'b;
 }
 
@@ -188,115 +198,78 @@ pub trait PayloadInfo {
 /// complete serialization and deserialization of types.
 ///
 /// # Methods
-/// - `fn from_packet<'b, B>(
-///       ctx: &mut C, 
-///       buffer: B
-///   ) -> Result<Self, Error>`:
+/// - `fn from_packet<'b, 'c, M: Middleware>(ctx: &mut C, next: &'c mut M) -> Result<Self, Error>`:
 ///     - Deserializes a buffer into a value. This method takes a context and a buffer containing the serialized
 ///       data, and returns the deserialized value.
-/// - `fn from_packet_mw<'b, 'c, B, M: Middleware>(
-///       ctx: &mut C, 
-///       buffer: B, 
-///       next: &'c mut M
-///   ) -> Result<Self, Error>`:
-///     - Deserializes a buffer into a value using a middleware. This method works similarly to `from_packet`, 
-///       but additionally uses middleware for the deserialization process.
-/// - `fn into_packet<'b>(
-///       &'b self, 
-///       ctx: &mut C, 
-///       capacity: usize
-///   ) -> Result<Vec<u8>, Error>`:
+/// - `fn into_packet<'b, 'c, M: Middleware>(&'b self, ctx: &mut C, next: &mut M) -> Result<(), Error>`:
 ///     - Serializes a value into a buffer. This method takes the value, context, and an initial buffer capacity, 
 ///       serializes the value, and returns the resulting byte buffer.
-/// - `fn into_packet_mw<'b, 'c, M: Middleware>(
-///       &'b self, 
-///       ctx: &mut C, 
-///       capacity: usize, 
-///       next: &mut M
-///   ) -> Result<Vec<u8>, Error>`:
-///     - Serializes a value into a buffer using a middleware. This method works similarly to `into_packet`, 
-///       but additionally uses middleware for the serialization process.
-pub trait Payload<'a, C: PayloadContext>: IntoPayload<C> + FromPayload<'a, C> + PayloadInfo {
-    fn from_packet<'b, B>(ctx: &mut C, buffer: B) -> Result<Self, Error>
-        where
-            Self: FromPayload<'a, C>,
-            B: Into<Cow<'a, [u8]>>,
-            'b: 'a,
-    {
-        #[cfg(feature = "tracing")]
-        let next = &mut {
-            let mut default = TraceInfo::default();
-
-            default.ctx = Self::TYPE;
-            default
-        };
-
-        #[cfg(not(feature = "tracing"))]
-        let next = &mut ();
-
-        <Self>::from_packet_mw(ctx, buffer, next)
-    }
-
+pub trait Payload<'a, C>: IntoPayload<C> + FromPayload<'a, C> + PayloadInfo {
     #[inline(always)]
-    fn from_packet_mw<'b, 'c, B, M: Middleware>(ctx: &mut C, buffer: B, next: &'c mut M) -> Result<Self, Error>
+    fn from_packet<'b, 'c, M: Middleware>(ctx: &mut C, next: &'c mut M) -> Result<Self, Error>
         where
             Self: FromPayload<'a, C>,
-            B: Into<Cow<'a, [u8]>>,
             'b: 'a,
     {
-        <Self>::from_payload(&mut buffer.into(), ctx, next)
+        <Self>::from_payload(ctx, next)
     }
 
-    fn into_packet<'b>(&'b self, ctx: &mut C, capacity: usize) -> Result<Vec<u8>, Error>
+    fn into_packet<'b, 'c, M: Middleware>(&'b self, ctx: &mut C, next: &mut M) -> Result<(), Error>
         where
             Self: IntoPayload<C>,
             'b: 'a,
     {
-        #[cfg(feature = "tracing")]
-        let next = &mut {
-            let mut default = TraceInfo::default();
-
-            default.ctx = Self::TYPE;
-            default
-        };
-
-        #[cfg(not(feature = "tracing"))]
-        let next = &mut ();
-
-        self.into_packet_mw(ctx, capacity, next)
+        self.into_payload(ctx, next)
     }
+}
 
-    fn into_packet_mw<'b, 'c, M: Middleware>(&'b self, ctx: &mut C, capacity: usize, next: &mut M) -> Result<Vec<u8>, Error>
-        where
-            Self: IntoPayload<C>,
-            'b: 'a,
+/// The `AsyncPayload` trait extends `PayloadInfo` with asynchronous methods for
+/// complete serialization and deserialization of types.
+///
+/// # Associated Types
+/// - `State`: The state type used for asynchronous operations.
+///
+/// # Methods
+/// - `fn poll_state(ctx: &mut C) -> Self::State`:
+///     - Returns the initial state for asynchronous operations.
+/// - `fn poll_into_packet<'b, M: AsyncMiddleware>(&'b self, ctx: &'b mut C, next: &'b mut M) -> AsyncIntoState<'b, C, Self::State, Self, M>`:
+///     - Initiates the asynchronous conversion of a value into a packet.
+/// - `fn poll_from_packet<'b, M: AsyncMiddleware>(ctx: &'b mut C, next: &'b mut M) -> AsyncFromState<'b, C, Self::State, Self, M>`:
+///     - Initiates the asynchronous deserialization of a packet into a value.
+pub trait AsyncPayload<C>: PayloadInfo {
+    fn poll_into_packet<'b, M: AsyncMiddleware>(&'b self, ctx: &'b mut C, next: &'b mut M) -> impl Future<Output = Result<(), Error>> 
+        where 
+            Self: AsyncIntoPayload<C> + Sized
     {
-        let mut buffer = ::std::borrow::Cow::from(Vec::with_capacity(capacity));
-
-        self.into_payload(&mut buffer, ctx, next)?;
-
-        Ok(buffer.to_vec())
+        next.poll_into_payload(self, ctx)
     }
+
+    fn poll_from_packet<'b, M: AsyncMiddleware>(ctx: &'b mut C, next: &'b mut M) -> impl Future<Output = Result<Self, Error>> 
+        where 
+            Self: AsyncFromPayload<'b, C> + Sized,
+    {
+       next.poll_from_payload(ctx)
+    }
+    
 }
 
 pub mod middleware;
 pub mod error;
 pub mod payload;
+pub mod poll_payload;
 pub mod features;
-pub mod context;
-pub mod poll;
 
-pub use poll::*;
+use core::future::Future;
 
 #[doc(hidden)]
 pub use xxhash_rust::const_xxh3::xxh3_64 as PayloadConstHash;
 #[doc(hidden)]
 pub use xxhash_rust::xxh3::xxh3_64 as PayloadHash;
-#[doc(hidden)]
-use std::borrow::Cow;
 
 #[cfg(feature = "tracing")]
 use middleware::tracing::TraceInfo;
 
-pub use error::Error;
-pub use npsd_schema::{Schema, Bitmap};
+pub use error::*;
+pub use poll_payload::*;
+pub use middleware::*;
+pub use npsd_schema::*;
