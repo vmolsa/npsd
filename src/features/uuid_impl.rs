@@ -38,10 +38,10 @@ impl<'a, C> FromPayload<'a, C> for Uuid {
 impl<C> Payload<C> for Uuid {}
 
 #[cfg(feature = "async")]
-impl<C> AsyncPayload<C> for Uuid {}
+impl<C: Send + Sync> AsyncPayload<C> for Uuid {}
 
 #[cfg(feature = "async")]
-impl<C> AsyncIntoPayload<C> for Uuid {
+impl<C: Send + Sync> AsyncIntoPayload<C> for Uuid {
     #[inline]
     async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), PayloadError> {
         next.poll_into_payload(&self.as_u128(), ctx).await
@@ -49,7 +49,7 @@ impl<C> AsyncIntoPayload<C> for Uuid {
 }
 
 #[cfg(feature = "async")]
-impl<'a, C> AsyncFromPayload<'a, C> for Uuid {
+impl<'a, C: Send + Sync> AsyncFromPayload<'a, C> for Uuid {
     #[inline]
     async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, PayloadError>
         where

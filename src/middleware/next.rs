@@ -323,7 +323,7 @@ impl Middleware for NextTrace<'_> {
 #[cfg(feature = "async")]
 impl AsyncMiddleware for NextTrace<'_> {
     #[inline(always)]
-    async fn poll_into_payload<C, T: AsyncIntoPayload<C>>(
+    async fn poll_into_payload<C: Send + Sync, T: AsyncIntoPayload<C>>(
         &mut self,
         value: &T,
         ctx: &mut C
@@ -355,7 +355,7 @@ impl AsyncMiddleware for NextTrace<'_> {
     }
     
     #[inline(always)]
-    async fn poll_from_payload<'a, 'b, C, T: AsyncFromPayload<'a, C>> (
+    async fn poll_from_payload<'a, 'b, C: Send + Sync, T: AsyncFromPayload<'a, C>> (
         &'b mut self, 
         ctx: &mut C,
     ) -> Result<T, Error> 

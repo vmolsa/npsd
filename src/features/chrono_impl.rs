@@ -112,7 +112,7 @@ impl<'a, C> FromPayload<'a, C> for DateTime<Utc> {
 impl<'a, C> Payload<C> for DateTime<Utc> {}
 
 #[cfg(feature = "async")]
-impl<C> AsyncIntoPayload<C> for DateTime<Utc> {
+impl<C: Send + Sync> AsyncIntoPayload<C> for DateTime<Utc> {
     #[inline]
     async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error> {
         next.poll_into_payload(&self.to_rfc3339(), ctx).await
@@ -120,7 +120,7 @@ impl<C> AsyncIntoPayload<C> for DateTime<Utc> {
 }
 
 #[cfg(feature = "async")]
-impl<'a, C> AsyncFromPayload<'a, C> for DateTime<Utc> {
+impl<'a, C: Send + Sync> AsyncFromPayload<'a, C> for DateTime<Utc> {
     #[inline]
     async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
         where
@@ -133,7 +133,7 @@ impl<'a, C> AsyncFromPayload<'a, C> for DateTime<Utc> {
 }
 
 #[cfg(feature = "async")]
-impl<C> AsyncPayload<C> for DateTime<Utc> {}
+impl<C: Send + Sync> AsyncPayload<C> for DateTime<Utc> {}
 
 impl PayloadInfo for DateTime<Local> {
     const TYPE: &'static str = "DateTime<Local>";
@@ -165,7 +165,7 @@ impl<'a, C> FromPayload<'a, C> for DateTime<Local> {
 impl<C> Payload<C> for DateTime<Local> {}
 
 #[cfg(feature = "async")]
-impl<C> AsyncIntoPayload<C> for DateTime<Local> {
+impl<C: Send + Sync> AsyncIntoPayload<C> for DateTime<Local> {
     #[inline]
     async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error> {
         next.poll_into_payload(&self.to_rfc3339(), ctx).await
@@ -173,7 +173,7 @@ impl<C> AsyncIntoPayload<C> for DateTime<Local> {
 }
 
 #[cfg(feature = "async")]
-impl<'a, C> AsyncFromPayload<'a, C> for DateTime<Local> {
+impl<'a, C: Send + Sync> AsyncFromPayload<'a, C> for DateTime<Local> {
     #[inline]
     async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
         where
@@ -185,7 +185,7 @@ impl<'a, C> AsyncFromPayload<'a, C> for DateTime<Local> {
     }
 }
 #[cfg(feature = "async")]
-impl<C> AsyncPayload<C> for DateTime<Local> {}
+impl<C: Send + Sync> AsyncPayload<C> for DateTime<Local> {}
 
 impl PayloadInfo for DateTime<FixedOffset> {
     const TYPE: &'static str = "DateTime<FixedOffset>";
@@ -217,7 +217,7 @@ impl<'a, C> FromPayload<'a, C> for DateTime<FixedOffset> {
 impl<C> Payload<C> for DateTime<FixedOffset> {}
 
 #[cfg(feature = "async")]
-impl<C> AsyncIntoPayload<C> for DateTime<FixedOffset> {
+impl<C: Send + Sync> AsyncIntoPayload<C> for DateTime<FixedOffset> {
     #[inline]
     async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error> {
         next.poll_into_payload(&self.to_rfc3339(), ctx).await
@@ -225,7 +225,7 @@ impl<C> AsyncIntoPayload<C> for DateTime<FixedOffset> {
 }
 
 #[cfg(feature = "async")]
-impl<'a, C> AsyncFromPayload<'a, C> for DateTime<FixedOffset> {
+impl<'a, C: Send + Sync> AsyncFromPayload<'a, C> for DateTime<FixedOffset> {
     #[inline]
     async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
         where
@@ -238,4 +238,4 @@ impl<'a, C> AsyncFromPayload<'a, C> for DateTime<FixedOffset> {
 }
 
 #[cfg(feature = "async")]
-impl<C> AsyncPayload<C> for DateTime<FixedOffset> {}
+impl<C: Send + Sync> AsyncPayload<C> for DateTime<FixedOffset> {}

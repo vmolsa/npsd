@@ -50,7 +50,7 @@ impl<'a, C, K: Payload<C>, V: Payload<C>> Payload<C> for FxHashMap<K, V>
     where K: Hash + Eq {}
 
 #[cfg(feature = "async")]
-impl<C, K: AsyncIntoPayload<C>, V: AsyncIntoPayload<C>> AsyncIntoPayload<C> for FxHashMap<K, V> {
+impl<C: Send + Sync, K: AsyncIntoPayload<C>, V: AsyncIntoPayload<C>> AsyncIntoPayload<C> for FxHashMap<K, V> {
     async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error> {
         next.poll_into_payload(&self.len(), ctx).await?;
 
@@ -64,7 +64,7 @@ impl<C, K: AsyncIntoPayload<C>, V: AsyncIntoPayload<C>> AsyncIntoPayload<C> for 
 } 
 
 #[cfg(feature = "async")]
-impl<'a, C, K: AsyncFromPayload<'a, C>, V: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for FxHashMap<K, V> 
+impl<'a, C: Send + Sync, K: AsyncFromPayload<'a, C>, V: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for FxHashMap<K, V> 
     where K: Hash + Eq 
 {
     async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
@@ -86,7 +86,7 @@ impl<'a, C, K: AsyncFromPayload<'a, C>, V: AsyncFromPayload<'a, C>> AsyncFromPay
 }
 
 #[cfg(feature = "async")]
-impl<C, K: AsyncPayload<C>, V: AsyncPayload<C>> AsyncPayload<C> for FxHashMap<K, V> 
+impl<C: Send + Sync, K: AsyncPayload<C>, V: AsyncPayload<C>> AsyncPayload<C> for FxHashMap<K, V> 
     where K: Hash + Eq {}
 
 impl<K: PayloadInfo, V: PayloadInfo> PayloadInfo for FxHashMap<K, V> {
@@ -138,7 +138,7 @@ impl<K: PayloadInfo> PayloadInfo for FxHashSet<K> {
 }
 
 #[cfg(feature = "async")]
-impl<C, K: AsyncIntoPayload<C>> AsyncIntoPayload<C> for FxHashSet<K> {
+impl<C: Send + Sync, K: AsyncIntoPayload<C>> AsyncIntoPayload<C> for FxHashSet<K> {
     async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error> {
         next.poll_into_payload(&self.len(), ctx).await?;
 
@@ -151,7 +151,7 @@ impl<C, K: AsyncIntoPayload<C>> AsyncIntoPayload<C> for FxHashSet<K> {
 }
 
 #[cfg(feature = "async")]
-impl<'a, C, K: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for FxHashSet<K> 
+impl<'a, C: Send + Sync, K: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for FxHashSet<K> 
     where K: Hash + Eq 
 {
     async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
@@ -172,5 +172,5 @@ impl<'a, C, K: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for FxHashSet<K>
 }
 
 #[cfg(feature = "async")]
-impl<C, K: AsyncPayload<C>> AsyncPayload<C> for FxHashSet<K> 
+impl<C: Send + Sync, K: AsyncPayload<C>> AsyncPayload<C> for FxHashSet<K> 
     where K: Hash + Eq {}
