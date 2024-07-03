@@ -198,6 +198,12 @@ impl<'a> Default for Next<'a> {
     }
 }
 
+impl<'a, T: Into<Cow<'a, [u8]>>> From<T> for Next<'a> {
+    fn from(value: T) -> Self {
+        Next(value.into())
+    }
+}
+
 /// The `NextTrace` struct provides middleware functionality for tracing and debugging serialization
 /// and deserialization operations. It maintains a nested context to help identify and report errors
 /// and their locations in the payload structure. Requires the `info` feature to be enabled.
@@ -221,6 +227,13 @@ impl<'a> NextTrace<'a> {
     #[inline(always)]
     pub fn serialized(&self) -> Vec<u8> {
         self.0.to_vec()
+    }
+}
+
+#[cfg(feature = "info")]
+impl<'a, T: Into<Cow<'a, [u8]>>> From<T> for NextTrace<'a> {
+    fn from(value: T) -> Self {
+        Self(value.into(), MAX_NESTED_DEPTH, LinkedList::new())
     }
 }
 
