@@ -1,6 +1,6 @@
 use super::{Error, AsyncFromPayload, AsyncIntoPayload, AsyncMiddleware, AsyncPayload};
 
-impl<C, T: AsyncIntoPayload<C>> AsyncIntoPayload<C> for Option<T> {
+impl<C: Send + Sync, T: AsyncIntoPayload<C>> AsyncIntoPayload<C> for Option<T> {
     async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error> {
         if let Some(data) = self {
             next.poll_into_payload(&1u8, ctx).await?;
@@ -11,7 +11,7 @@ impl<C, T: AsyncIntoPayload<C>> AsyncIntoPayload<C> for Option<T> {
     }
 }
 
-impl<'a, C, T: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for Option<T> {
+impl<'a, C: Send + Sync, T: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for Option<T> {
     async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
         where 'a: 'b
     {
@@ -27,9 +27,9 @@ impl<'a, C, T: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for Option<T> {
     }
 }
 
-impl<C, T: AsyncPayload<C>> AsyncPayload<C> for Option<T> {}
+impl<C: Send + Sync, T: AsyncPayload<C>> AsyncPayload<C> for Option<T> {}
 
-impl<C, T: AsyncIntoPayload<C>, E: AsyncIntoPayload<C>> AsyncIntoPayload<C> for Result<T, E> {
+impl<C: Send + Sync, T: AsyncIntoPayload<C>, E: AsyncIntoPayload<C>> AsyncIntoPayload<C> for Result<T, E> {
     async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error> {
         match self {
             Ok(res) => {
@@ -44,7 +44,7 @@ impl<C, T: AsyncIntoPayload<C>, E: AsyncIntoPayload<C>> AsyncIntoPayload<C> for 
     }
 }
 
-impl<'a, C, T: AsyncFromPayload<'a, C>, E: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for Result<T, E> {
+impl<'a, C: Send + Sync, T: AsyncFromPayload<'a, C>, E: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for Result<T, E> {
     async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
         where 'a: 'b
     {
@@ -62,4 +62,4 @@ impl<'a, C, T: AsyncFromPayload<'a, C>, E: AsyncFromPayload<'a, C>> AsyncFromPay
     }
 }
 
-impl<C, T: AsyncPayload<C>, E: AsyncPayload<C>> AsyncPayload<C> for Result<T, E> {}
+impl<C: Send + Sync, T: AsyncPayload<C>, E: AsyncPayload<C>> AsyncPayload<C> for Result<T, E> {}

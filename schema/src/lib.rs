@@ -21,7 +21,7 @@
 //! Generates asynchronous implementations for payload processing traits for bitmap structures with up to 8 fields.
 
 #[doc(hidden)]
-use syn::{parse_macro_input, parse_quote, punctuated::Punctuated, spanned::Spanned, token::Plus, Data, DataEnum, DeriveInput, Fields, FieldsNamed, FieldsUnnamed, GenericParam, Generics, Ident, Index, Lifetime, LifetimeParam, TypeParamBound};
+use syn::{parse_macro_input, TypeParam, parse_quote, punctuated::Punctuated, spanned::Spanned, token::Plus, Data, DataEnum, DeriveInput, Fields, FieldsNamed, FieldsUnnamed, GenericParam, Generics, Ident, Index, Lifetime, LifetimeParam, TypeParamBound};
 #[doc(hidden)]
 use quote::{quote, quote_spanned};
 #[doc(hidden)]
@@ -695,8 +695,15 @@ fn async_schema_impl(input: TokenStream, internal: bool) -> TokenStream {
     let mw = Ident::new(DEFAULT_MIDDLEWARE, Span::call_site());
     let mut context_generics = generics.clone();
 
-    let context_param: GenericParam = syn::parse_quote!(#context);
-    context_generics.params.push(context_param);
+    let mut context_param: TypeParam = syn::parse_quote!(#context);
+
+    let send_bound: TypeParamBound = syn::parse_quote!(Send);
+    let sync_bound: TypeParamBound = syn::parse_quote!(Sync);
+
+    context_param.bounds.push(send_bound);
+    context_param.bounds.push(sync_bound);
+
+    context_generics.params.push(GenericParam::Type(context_param));
 
     let mut into_generics = context_generics.clone();
     let mut from_generics = context_generics.clone();
@@ -1050,7 +1057,7 @@ fn async_generate_into_payload_impl(name: &Ident, fields: &Fields, context: &Ide
 
     if internal {
         quote! {
-            impl<#context> AsyncIntoPayload<#context> for #name {
+            impl<#context: Send + Sync> AsyncIntoPayload<#context> for #name {
                 async fn poll_into_payload<#mw: AsyncMiddleware>(&self, ctx: &mut #context, next: &mut #mw) -> Result<(), Error> {
                     let mut byte: u8 = 0;
                     #(#field_conversions)*
@@ -1060,7 +1067,7 @@ fn async_generate_into_payload_impl(name: &Ident, fields: &Fields, context: &Ide
         }
     } else {
         quote! {
-            impl<#context> npsd::AsyncIntoPayload<#context> for #name {
+            impl<#context: Send + Sync> npsd::AsyncIntoPayload<#context> for #name {
                 async fn poll_into_payload<#mw: npsd::AsyncMiddleware>(&self, ctx: &mut #context, next: &mut #mw) -> Result<(), npsd::Error> {
                     let mut byte: u8 = 0;
                     #(#field_conversions)*
@@ -1099,7 +1106,7 @@ fn async_generate_from_payload_impl(name: &Ident, fields: &Fields, lifetime: &Li
 
     if internal {
         quote! {
-            impl<#lifetime, #context> AsyncFromPayload<#lifetime, #context> for #name {
+            impl<#lifetime, #context: Send + Sync> AsyncFromPayload<#lifetime, #context> for #name {
                 async fn poll_from_payload<#scope, #mw: AsyncMiddleware>(ctx: &mut #context, next: &#scope mut #mw) -> Result<Self, Error>
                     where
                         #lifetime: #scope
@@ -1114,7 +1121,7 @@ fn async_generate_from_payload_impl(name: &Ident, fields: &Fields, lifetime: &Li
         }
     } else {
         quote! {
-            impl<#lifetime, #context> npsd::AsyncFromPayload<#lifetime, #context> for #name {
+            impl<#lifetime, #context: Send + Sync> npsd::AsyncFromPayload<#lifetime, #context> for #name {
                 async fn poll_from_payload<#scope, #mw: npsd::AsyncMiddleware>(ctx: &mut #context, next: &#scope mut #mw) -> Result<Self, npsd::Error>
                     where
                         #lifetime: #scope
@@ -1134,11 +1141,11 @@ fn async_generate_from_payload_impl(name: &Ident, fields: &Fields, lifetime: &Li
 fn async_generate_payload_impl(name: &Ident, context: &Ident, internal: bool) -> proc_macro2::TokenStream {
     if internal {
         quote! {
-            impl<#context> AsyncPayload<#context> for #name {}
+            impl<#context: Send + Sync> AsyncPayload<#context> for #name {}
         }
     } else {
         quote! {
-            impl<#context> npsd::AsyncPayload<#context> for #name {}
+            impl<#context: Send + Sync> npsd::AsyncPayload<#context> for #name {}
         }
     }
 }

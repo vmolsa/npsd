@@ -2,14 +2,14 @@ use core::str;
 
 use super::{Error, AsyncMiddleware, AsyncPayload, AsyncIntoPayload, AsyncFromPayload};
 
-impl<C> AsyncIntoPayload<C> for char {
+impl<C: Send + Sync> AsyncIntoPayload<C> for char {
     #[inline]
     async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error> {
         next.poll_into_payload(&(*self as u32).to_be_bytes(), ctx).await
     }
 }
 
-impl<'a, C> AsyncFromPayload<'a, C> for char {
+impl<'a, C: Send + Sync> AsyncFromPayload<'a, C> for char {
     async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
         where 'a: 'b
     {
@@ -23,16 +23,16 @@ impl<'a, C> AsyncFromPayload<'a, C> for char {
     }
 }
 
-impl<C> AsyncPayload<C> for char {}
+impl<C: Send + Sync> AsyncPayload<C> for char {}
 
-impl<'a, C> AsyncIntoPayload<C> for &'a str {
+impl<'a, C: Send + Sync> AsyncIntoPayload<C> for &'a str {
     #[inline]
     async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error> {
         next.poll_into_payload(&self.as_bytes(), ctx).await
     }
 }
 
-impl<'a, C> AsyncFromPayload<'a, C> for &'a str {
+impl<'a, C: Send + Sync> AsyncFromPayload<'a, C> for &'a str {
     async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
         where 'a: 'b
     {
@@ -46,16 +46,16 @@ impl<'a, C> AsyncFromPayload<'a, C> for &'a str {
     }
 }
 
-impl<'a, C> AsyncPayload<C> for &'a str {}
+impl<'a, C: Send + Sync> AsyncPayload<C> for &'a str {}
 
-impl<'a, C> AsyncIntoPayload<C> for &'a mut str {
+impl<'a, C: Send + Sync> AsyncIntoPayload<C> for &'a mut str {
     #[inline]
     async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error> {
         next.poll_into_payload(&self.as_bytes(), ctx).await
     }
 }
 
-impl<'a, C> AsyncFromPayload<'a, C> for &'a mut str {
+impl<'a, C: Send + Sync> AsyncFromPayload<'a, C> for &'a mut str {
     async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
         where 'a: 'b
     {
@@ -69,15 +69,15 @@ impl<'a, C> AsyncFromPayload<'a, C> for &'a mut str {
     }
 }
 
-impl<'a, C> AsyncPayload<C> for &'a mut str {}
+impl<'a, C: Send + Sync> AsyncPayload<C> for &'a mut str {}
 
-impl<C> AsyncIntoPayload<C> for String {
+impl<C: Send + Sync> AsyncIntoPayload<C> for String {
     async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error> {
         next.poll_into_payload(&self.as_bytes(), ctx).await
     }
 }
 
-impl<'a, C> AsyncFromPayload<'a, C> for String {
+impl<'a, C: Send + Sync> AsyncFromPayload<'a, C> for String {
     async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
         where 'a: 'b
     {
@@ -91,4 +91,4 @@ impl<'a, C> AsyncFromPayload<'a, C> for String {
     }
 }
 
-impl<C> AsyncPayload<C> for String {}
+impl<C: Send + Sync> AsyncPayload<C> for String {}

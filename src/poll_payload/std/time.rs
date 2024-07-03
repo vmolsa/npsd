@@ -2,7 +2,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use super::{Error, AsyncMiddleware, AsyncPayload, AsyncIntoPayload, AsyncFromPayload};
 
-impl<C> AsyncIntoPayload<C> for Duration {
+impl<C: Send + Sync> AsyncIntoPayload<C> for Duration {
     async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error> {
         let secs = self.as_secs();
         let nanos = self.subsec_nanos();
@@ -11,7 +11,7 @@ impl<C> AsyncIntoPayload<C> for Duration {
     }
 }
 
-impl<'a, C> AsyncFromPayload<'a, C> for Duration {
+impl<'a, C: Send + Sync> AsyncFromPayload<'a, C> for Duration {
     async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
         where 'a: 'b,
     {
@@ -21,9 +21,9 @@ impl<'a, C> AsyncFromPayload<'a, C> for Duration {
     }
 }
 
-impl<C> AsyncPayload<C> for Duration {}
+impl<C: Send + Sync> AsyncPayload<C> for Duration {}
 
-impl<C> AsyncIntoPayload<C> for Instant {
+impl<C: Send + Sync> AsyncIntoPayload<C> for Instant {
     async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error> {
         match SystemTime::now().duration_since(UNIX_EPOCH) {
             Ok(time) => next.poll_into_payload(&time, ctx).await,
@@ -32,7 +32,7 @@ impl<C> AsyncIntoPayload<C> for Instant {
     }
 }
 
-impl<C> AsyncIntoPayload<C> for SystemTime {
+impl<C: Send + Sync> AsyncIntoPayload<C> for SystemTime {
     async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error> {
         match SystemTime::now().duration_since(UNIX_EPOCH) {
             Ok(time) => next.poll_into_payload(&time, ctx).await,
@@ -41,7 +41,7 @@ impl<C> AsyncIntoPayload<C> for SystemTime {
     }
 }
 
-impl<'a, C> AsyncFromPayload<'a, C> for SystemTime {
+impl<'a, C: Send + Sync> AsyncFromPayload<'a, C> for SystemTime {
     #[inline]
     async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
         where 'a: 'b,
@@ -50,4 +50,4 @@ impl<'a, C> AsyncFromPayload<'a, C> for SystemTime {
     }
 }
 
-impl<C> AsyncPayload<C> for SystemTime {}
+impl<C: Send + Sync> AsyncPayload<C> for SystemTime {}

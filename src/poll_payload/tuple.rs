@@ -3,9 +3,9 @@ use super::{Error, AsyncMiddleware, AsyncPayload, AsyncIntoPayload, AsyncFromPay
 #[macro_export]
 macro_rules! async_payload_tuple {
     (($(($T:ident, $i:tt)),+), $len:tt) => {
-        impl<X, $($T),+> AsyncIntoPayload<X> for ($($T,)+) 
+        impl<X: Send + Sync, $($T),+> AsyncIntoPayload<X> for ($($T,)+) 
             where
-                $($T: AsyncIntoPayload<X>,)+
+                $($T: AsyncIntoPayload<X> + Send + Sync,)+
         {
             async fn poll_into_payload<Y: AsyncMiddleware>(&self, ctx: &mut X, next: &mut Y) -> Result<(), Error> {
                 $(
@@ -16,7 +16,7 @@ macro_rules! async_payload_tuple {
             }
         }
 
-        impl<'a, X, $($T),+> AsyncFromPayload<'a, X> for ($($T,)+) 
+        impl<'a, X: Send + Sync, $($T),+> AsyncFromPayload<'a, X> for ($($T,)+) 
             where
                 $($T: AsyncFromPayload<'a, X>,)+
         {
@@ -29,7 +29,7 @@ macro_rules! async_payload_tuple {
             }
         }
 
-        impl<X, $($T),+> AsyncPayload<X> for ($($T,)+) 
+        impl<X: Send + Sync, $($T),+> AsyncPayload<X> for ($($T,)+) 
             where
                 $($T: AsyncPayload<X>,)+ {}
     };

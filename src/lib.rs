@@ -198,9 +198,9 @@ pub trait Middleware {
 /// - `fn poll_read<'a, 'b, T: 'a>(&'b mut self, nbytes: usize) -> impl Future<Output = Result<&'a [T], Error>>`:
 ///     - Polls the asynchronous reading of raw data from the handler.
 #[cfg(feature = "async")]
-pub trait AsyncMiddleware {
-    fn poll_into_payload<C, T: AsyncIntoPayload<C>>(&mut self, value: &T, ctx: &mut C) -> impl Future<Output = Result<(), Error>>;
-    fn poll_from_payload<'a, 'b, C, T: AsyncFromPayload<'a, C>>(&'b mut self, ctx: &mut C) -> impl Future<Output = Result<T, Error>> where 'a: 'b;
+pub trait AsyncMiddleware: Send + Sync {
+    fn poll_into_payload<C: Send + Sync, T: AsyncIntoPayload<C>>(&mut self, value: &T, ctx: &mut C) -> impl Future<Output = Result<(), Error>>;
+    fn poll_from_payload<'a, 'b, C: Send + Sync, T: AsyncFromPayload<'a, C>>(&'b mut self, ctx: &mut C) -> impl Future<Output = Result<T, Error>> where 'a: 'b;
     fn poll_write<T>(&mut self, data: &[T]) -> impl Future<Output = Result<(), Error>>;
     fn poll_read<'a,'b, T: 'a>(&mut self, nbytes: usize) -> impl Future<Output = Result<&'a [T], Error>>;
 }
@@ -229,13 +229,13 @@ pub trait IntoPayload<C>: PayloadInfo {
 ///     - Polls the conversion of a value into a payload of bytes asynchronously.
 #[cfg(not(feature = "info"))]
 #[cfg(feature = "async")]
-pub trait AsyncIntoPayload<C> {
+pub trait AsyncIntoPayload<C: Send + Sync>: Send + Sync {
     fn poll_into_payload<M: AsyncMiddleware>(&self, ctx: &mut C, next: &mut M) -> impl Future<Output = Result<(), Error>>;
 }
 
 #[cfg(feature = "info")]
 #[cfg(feature = "async")]
-pub trait AsyncIntoPayload<C>: PayloadInfo {
+pub trait AsyncIntoPayload<C: Send + Sync>: PayloadInfo + Send + Sync {
     fn poll_into_payload<M: AsyncMiddleware>(&self, ctx: &mut C, next: &mut M) -> impl Future<Output = Result<(), Error>>;
 }
 
@@ -265,14 +265,14 @@ pub trait FromPayload<'a, C>: PayloadInfo + Sized {
 ///     - Polls the conversion of a payload of bytes back into a value asynchronously.
 #[cfg(not(feature = "info"))]
 #[cfg(feature = "async")]
-pub trait AsyncFromPayload<'a, C>: Sized {
+pub trait AsyncFromPayload<'a, C: Send + Sync>: Sized + Send + Sync {
     fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> impl Future<Output = Result<Self, Error>>
         where 'a: 'b;
 }
 
 #[cfg(feature = "info")]
 #[cfg(feature = "async")]
-pub trait AsyncFromPayload<'a, C>: PayloadInfo + Sized {
+pub trait AsyncFromPayload<'a, C: Send + Sync>: PayloadInfo + Sized + Send + Sync {
     fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> impl Future<Output = Result<Self, Error>>
         where 'a: 'b;
 }
@@ -308,7 +308,7 @@ pub trait Payload<C> {
 /// - `fn poll_from_packet<'b, M: AsyncMiddleware>(ctx: &'b mut C, next: &'b mut M) -> impl Future<Output = Result<Self, Error>>`:
 ///     - Initiates the asynchronous deserialization of a packet into a value.
 #[cfg(feature = "async")]
-pub trait AsyncPayload<C> {
+pub trait AsyncPayload<C: Send + Sync>: Send + Sync {
     fn poll_into_packet<'b, M: AsyncMiddleware>(&'b self, ctx: &'b mut C, next: &'b mut M) -> impl Future<Output = Result<(), Error>>
         where Self: AsyncIntoPayload<C> + Sized
     {

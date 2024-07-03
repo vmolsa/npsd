@@ -84,7 +84,7 @@ impl Middleware for Next<'_> {
 #[cfg(feature = "async")]
 impl AsyncMiddleware for Next<'_> {
     #[inline(always)]
-    fn poll_into_payload<C, T: AsyncIntoPayload<C>>(
+    fn poll_into_payload<C: Send + Sync, T: AsyncIntoPayload<C>>(
         &mut self,
         value: &T,
         ctx: &mut C
@@ -93,7 +93,7 @@ impl AsyncMiddleware for Next<'_> {
     }
     
     #[inline(always)]
-    fn poll_from_payload<'a, 'b, C, T: AsyncFromPayload<'a, C>> (
+    fn poll_from_payload<'a, 'b, C: Send + Sync, T: AsyncFromPayload<'a, C>> (
         &'b mut self,
         ctx: &mut C,
     ) -> impl core::future::Future<Output = Result<T, Error>>

@@ -3,7 +3,7 @@ use std::{collections::{HashMap, HashSet}, hash::Hash};
 
 use super::{Error, AsyncMiddleware, AsyncPayload, AsyncIntoPayload, AsyncFromPayload};
 
-impl<C, T: AsyncIntoPayload<C>> AsyncIntoPayload<C> for VecDeque<T> {
+impl<C: Send + Sync, T: AsyncIntoPayload<C>> AsyncIntoPayload<C> for VecDeque<T> {
     #[inline]
     async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error> {
         next.poll_into_payload(&self.len(), ctx).await?;
@@ -16,7 +16,7 @@ impl<C, T: AsyncIntoPayload<C>> AsyncIntoPayload<C> for VecDeque<T> {
     }
 }
 
-impl<'a, C, T: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for VecDeque<T> {
+impl<'a, C: Send + Sync, T: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for VecDeque<T> {
     #[inline]
     async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
         where 'a: 'b,
@@ -32,9 +32,9 @@ impl<'a, C, T: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for VecDeque<T> 
     }
 }
 
-impl<C, T: AsyncPayload<C>> AsyncPayload<C> for VecDeque<T> {}
+impl<C: Send + Sync, T: AsyncPayload<C>> AsyncPayload<C> for VecDeque<T> {}
 
-impl<C, T: AsyncIntoPayload<C>> AsyncIntoPayload<C> for LinkedList<T> {
+impl<C: Send + Sync, T: AsyncIntoPayload<C>> AsyncIntoPayload<C> for LinkedList<T> {
     async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error>{
         next.poll_into_payload(&self.len(), ctx).await?;
 
@@ -46,7 +46,7 @@ impl<C, T: AsyncIntoPayload<C>> AsyncIntoPayload<C> for LinkedList<T> {
     }
 }
 
-impl<'a, C, T: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for LinkedList<T> {
+impl<'a, C: Send + Sync, T: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for LinkedList<T> {
     async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
         where 'a: 'b,
     {
@@ -61,9 +61,9 @@ impl<'a, C, T: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for LinkedList<T
     }
 }
 
-impl<C, T: AsyncPayload<C>> AsyncPayload<C> for LinkedList<T> {}
+impl<C: Send + Sync, T: AsyncPayload<C>> AsyncPayload<C> for LinkedList<T> {}
 
-impl<C, K: AsyncIntoPayload<C>, V: AsyncIntoPayload<C>> AsyncIntoPayload<C> for HashMap<K, V> {
+impl<C: Send + Sync, K: AsyncIntoPayload<C>, V: AsyncIntoPayload<C>> AsyncIntoPayload<C> for HashMap<K, V> {
     async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error>{
         next.poll_into_payload(&self.len(), ctx).await?;
 
@@ -76,7 +76,7 @@ impl<C, K: AsyncIntoPayload<C>, V: AsyncIntoPayload<C>> AsyncIntoPayload<C> for 
     }
 }
 
-impl<'a, C, K: AsyncFromPayload<'a, C>, V: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for HashMap<K, V> 
+impl<'a, C: Send + Sync, K: AsyncFromPayload<'a, C>, V: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for HashMap<K, V> 
     where K: Hash + Eq 
 {
     async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
@@ -96,10 +96,10 @@ impl<'a, C, K: AsyncFromPayload<'a, C>, V: AsyncFromPayload<'a, C>> AsyncFromPay
     }
 }
 
-impl<C, K: AsyncPayload<C>, V: AsyncPayload<C>> AsyncPayload<C> for HashMap<K, V> 
+impl<C: Send + Sync, K: AsyncPayload<C>, V: AsyncPayload<C>> AsyncPayload<C> for HashMap<K, V> 
     where K: Hash + Eq {}
 
-impl<C, K: AsyncIntoPayload<C>, V: AsyncIntoPayload<C>> AsyncIntoPayload<C> for BTreeMap<K, V> {
+impl<C: Send + Sync, K: AsyncIntoPayload<C>, V: AsyncIntoPayload<C>> AsyncIntoPayload<C> for BTreeMap<K, V> {
     async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error>{
         next.poll_into_payload(&self.len(), ctx).await?;
 
@@ -112,7 +112,7 @@ impl<C, K: AsyncIntoPayload<C>, V: AsyncIntoPayload<C>> AsyncIntoPayload<C> for 
     }
 }
 
-impl<'a, C, K: AsyncFromPayload<'a, C> + Ord, V: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for BTreeMap<K, V> 
+impl<'a, C: Send + Sync, K: AsyncFromPayload<'a, C> + Ord, V: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for BTreeMap<K, V> 
     where K: Hash + Eq 
 {
     async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
@@ -132,10 +132,10 @@ impl<'a, C, K: AsyncFromPayload<'a, C> + Ord, V: AsyncFromPayload<'a, C>> AsyncF
     }
 }
 
-impl<C, K: AsyncPayload<C>, V: AsyncPayload<C>> AsyncPayload<C> for BTreeMap<K, V> 
+impl<C: Send + Sync, K: AsyncPayload<C>, V: AsyncPayload<C>> AsyncPayload<C> for BTreeMap<K, V> 
     where K: Hash + Eq + Ord {}
 
-impl<C, K: AsyncIntoPayload<C>> AsyncIntoPayload<C> for HashSet<K> {
+impl<C: Send + Sync, K: AsyncIntoPayload<C>> AsyncIntoPayload<C> for HashSet<K> {
     async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error>{
         next.poll_into_payload(&self.len(), ctx).await?;
 
@@ -147,7 +147,7 @@ impl<C, K: AsyncIntoPayload<C>> AsyncIntoPayload<C> for HashSet<K> {
     }
 }
 
-impl<'a, C, K: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for HashSet<K> 
+impl<'a, C: Send + Sync, K: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for HashSet<K> 
     where K: Hash + Eq 
 {    
     async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
@@ -166,10 +166,10 @@ impl<'a, C, K: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for HashSet<K>
     }
 }
 
-impl<C, K: AsyncPayload<C>> AsyncPayload<C> for HashSet<K> 
+impl<C: Send + Sync, K: AsyncPayload<C>> AsyncPayload<C> for HashSet<K> 
     where K: Hash + Eq {}
 
-impl<C, K: AsyncIntoPayload<C>> AsyncIntoPayload<C> for BTreeSet<K> {
+impl<C: Send + Sync, K: AsyncIntoPayload<C>> AsyncIntoPayload<C> for BTreeSet<K> {
     async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error>{
         next.poll_into_payload(&self.len(), ctx).await?;
 
@@ -181,7 +181,7 @@ impl<C, K: AsyncIntoPayload<C>> AsyncIntoPayload<C> for BTreeSet<K> {
     }
 }
 
-impl<'a, C, K: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for BTreeSet<K> 
+impl<'a, C: Send + Sync, K: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for BTreeSet<K> 
     where K: Hash + Eq + Ord
 {    
     async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
@@ -200,10 +200,10 @@ impl<'a, C, K: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for BTreeSet<K>
     }
 }
 
-impl<C, K: AsyncPayload<C>> AsyncPayload<C> for BTreeSet<K> 
+impl<C: Send + Sync, K: AsyncPayload<C>> AsyncPayload<C> for BTreeSet<K> 
     where K: Hash + Eq + Ord {}
 
-impl<C, T: AsyncIntoPayload<C> + Ord> AsyncIntoPayload<C> for BinaryHeap<T> {
+impl<C: Send + Sync, T: AsyncIntoPayload<C> + Ord> AsyncIntoPayload<C> for BinaryHeap<T> {
     async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error> {
         next.poll_into_payload(&self.len(), ctx).await?;
 
@@ -215,7 +215,7 @@ impl<C, T: AsyncIntoPayload<C> + Ord> AsyncIntoPayload<C> for BinaryHeap<T> {
     }
 }
 
-impl<'a, C, T: AsyncFromPayload<'a, C> + Ord> AsyncFromPayload<'a, C> for BinaryHeap<T> {
+impl<'a, C: Send + Sync, T: AsyncFromPayload<'a, C> + Ord> AsyncFromPayload<'a, C> for BinaryHeap<T> {
     async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
         where 'a: 'b,
     {
@@ -230,16 +230,16 @@ impl<'a, C, T: AsyncFromPayload<'a, C> + Ord> AsyncFromPayload<'a, C> for Binary
     }
 }
 
-impl<C, T: AsyncPayload<C> + Ord> AsyncPayload<C> for BinaryHeap<T> {}
+impl<C: Send + Sync, T: AsyncPayload<C> + Ord> AsyncPayload<C> for BinaryHeap<T> {}
 
-impl<C, T: AsyncIntoPayload<C>> AsyncIntoPayload<C> for Vec<T> {
+impl<C: Send + Sync, T: AsyncIntoPayload<C>> AsyncIntoPayload<C> for Vec<T> {
     #[inline]
     async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error>{
         next.poll_into_payload(&self.as_slice(), ctx).await
     }
 }
 
-impl<'a, C, T: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for Vec<T> 
+impl<'a, C: Send + Sync, T: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for Vec<T> 
     where T: Clone + 'a 
 {
     #[inline]
@@ -250,10 +250,10 @@ impl<'a, C, T: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for Vec<T>
     }
 }
 
-impl<C, T: AsyncPayload<C>> AsyncPayload<C> for Vec<T> 
+impl<C: Send + Sync, T: AsyncPayload<C>> AsyncPayload<C> for Vec<T> 
     where T: Clone {}
 
-impl<'a, C, T: AsyncIntoPayload<C>> AsyncIntoPayload<C> for Cow<'a, [T]> 
+impl<'a, C: Send + Sync, T: AsyncIntoPayload<C>> AsyncIntoPayload<C> for Cow<'a, [T]> 
     where T: Clone 
 {
     async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error> {
@@ -291,7 +291,7 @@ impl<'a, C, T: AsyncIntoPayload<C>> AsyncIntoPayload<C> for Cow<'a, [T]>
     }
 }
 
-impl<'a, C, T: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for Cow<'a, [T]> 
+impl<'a, C: Send + Sync, T: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for Cow<'a, [T]> 
     where T: Clone 
 {
     async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
@@ -313,5 +313,5 @@ impl<'a, C, T: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for Cow<'a, [T]>
     }
 }
 
-impl<'a, C, T: AsyncPayload<C>> AsyncPayload<C> for Cow<'a, [T]> 
+impl<'a, C: Send + Sync, T: AsyncPayload<C>> AsyncPayload<C> for Cow<'a, [T]> 
     where T: Clone {}
