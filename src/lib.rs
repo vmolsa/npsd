@@ -74,13 +74,13 @@
 //!     let animal = Animal::Frog("Frog".to_string(), vec![12393818, -19383812, 11111, -1093838482]);
 //!
 //!     // Serialize the `animal` instance into a packet.
-//!     animal.into_packet(&mut (), &mut next).await.unwrap();
+//!     animal.poll_into_packet(&mut (), &mut next).await.unwrap();
 //!
 //!     // Create a copy of serialized data if needed
 //!     let _serialized = next.serialized();
 //!
 //!     // Deserialize the packet back into an `Animal` instance.
-//!     let deserialized = Animal::from_packet(&mut (), &mut next).await.unwrap();
+//!     let deserialized = Animal::poll_from_packet(&mut (), &mut next).await.unwrap();
 //!
 //!     // Ensure the deserialized instance matches the original.
 //!     assert_eq!(deserialized, animal);
@@ -148,13 +148,13 @@
 //!    let flags = Flags { a: true, b: false, c: true };
 //!
 //!    // Serialize the `Flags` into a packet.
-//!    flags.into_packet(&mut (), &mut next).await.unwrap();
+//!    flags.poll_into_packet(&mut (), &mut next).await.unwrap();
 //!
 //!    // Create a copy of serialized data if needed
 //!    let _serialized = next.serialized();
 //!
 //!    // Deserialize the packet back into an `Flags`.
-//!    let deserialized = Flags::from_packet(&mut (), &mut next).await.unwrap();
+//!    let deserialized = Flags::poll_from_packet(&mut (), &mut next).await.unwrap();
 //!
 //!    // Ensure the deserialized matches the original.
 //!    assert_eq!(deserialized, flags);
