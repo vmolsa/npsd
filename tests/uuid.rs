@@ -1,11 +1,11 @@
 #[cfg(feature = "uuid")]
-use npsd::{Payload, Schema};
+use npsd::{Payload, Info, Schema, Next};
 
 #[cfg(feature = "uuid")]
 use uuid::Uuid;
 
 #[cfg(feature = "uuid")]
-#[derive(Schema, PartialEq, Debug)]
+#[derive(Schema, Info, PartialEq, Debug)]
 struct MultiUuid {
     id0: Uuid,
     id1: Uuid,
@@ -20,6 +20,21 @@ struct MultiUuid {
 fn test_uuid_payload() {
     use pretty_hex::PrettyHex;
 
+    #[cfg(feature = "info")]
+    use npsd::NextTrace;
+
+    #[cfg(not(feature = "info"))]
+    use npsd::Next;
+
+    let mut ctx = ();
+
+    // Create Middleware
+    #[cfg(not(feature = "info"))]
+    let mut next = Next::default();
+
+    #[cfg(feature = "info")]
+    let mut next = NextTrace::default();
+
     let instance = MultiUuid {
         id0: Uuid::new_v4(),
         id1: Uuid::now_v7(),
@@ -29,11 +44,11 @@ fn test_uuid_payload() {
         id5: Uuid::now_v7(),
     };
 
-    let serialized = instance.into_packet(&mut (), 1470).unwrap();
+    instance.into_packet(&mut ctx, &mut next).unwrap();
 
-    println!("Encoded: {:?}", serialized.hex_dump());
+    println!("Encoded: {:?}", next.serialized().hex_dump());
 
-    let deserialized = MultiUuid::from_packet(&mut (), &serialized).unwrap();
+    let deserialized = MultiUuid::from_packet(&mut ctx, &mut next).unwrap();
 
     assert_eq!(instance, deserialized);
 }

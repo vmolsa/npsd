@@ -1,19 +1,38 @@
+#[cfg(feature = "sync")]
 use std::fmt::Debug;
-use npsd::{Payload, PayloadContext};
-use pretty_hex::PrettyHex;
 
-fn test_send_recv<'a, 'b, C, T, E>(ctx: &mut C, src: &'a T, dst: E)
-where
-    C: PayloadContext,
-    T: Payload<'a, C>,
-    E: Payload<'a, C> + PartialEq + Debug,
-    'a: 'b,
+#[cfg(feature = "sync")]
+use npsd::{FromPayload, IntoPayload, Payload};
+
+#[cfg(feature = "sync")]
+fn test_send_recv<T, E>(src: T, dst: E)
+    where
+        T: Payload<()> + IntoPayload<()>,
+        E: Payload<()> + for<'a> FromPayload<'a, ()> + PartialEq + Debug,
 {
-    let serialized = src.into_packet(ctx, 1470).unwrap();
+    use pretty_hex::PrettyHex;
 
-    println!("Encoded: {:?}", serialized.hex_dump());
 
-    let deserialized = E::from_packet(ctx, serialized).unwrap();
+    #[cfg(feature = "info")]
+    use npsd::NextTrace;
+
+    #[cfg(not(feature = "info"))]
+    use npsd::Next;
+
+    let mut ctx = ();
+
+    // Create Middleware
+    #[cfg(not(feature = "info"))]
+    let mut next = Next::default();
+
+    #[cfg(feature = "info")]
+    let mut next = NextTrace::default();
+
+    src.into_packet(&mut ctx, &mut next).unwrap();
+
+    println!("Encoded: {:?}", next.serialized().hex_dump());
+
+    let deserialized = E::from_packet(&mut ctx, &mut next).unwrap();
 
     assert_eq!(deserialized, dst);
 }
@@ -21,19 +40,20 @@ where
 macro_rules! test_tuples {
     ($value:expr) => {
         {
-            test_send_recv(&mut (), &$value, $value);
-            test_send_recv(&mut (), &($value), ($value));
-            test_send_recv(&mut (), &($value, $value), ($value, $value));
-            test_send_recv(&mut (), &($value, $value, $value), ($value, $value, $value));
-            test_send_recv(&mut (), &($value, $value, $value, $value), ($value, $value, $value, $value));
-            test_send_recv(&mut (), &($value, $value, $value, $value, $value), ($value, $value, $value, $value, $value));
-            test_send_recv(&mut (), &($value, $value, $value, $value, $value, $value), ($value, $value, $value, $value, $value, $value));
-            test_send_recv(&mut (), &($value, $value, $value, $value, $value, $value, $value), ($value, $value, $value, $value, $value, $value, $value));
-            test_send_recv(&mut (), &($value, $value, $value, $value, $value, $value, $value, $value), ($value, $value, $value, $value, $value, $value, $value, $value));
+            test_send_recv($value, $value);
+            test_send_recv(($value), ($value));
+            test_send_recv(($value, $value), ($value, $value));
+            test_send_recv(($value, $value, $value), ($value, $value, $value));
+            test_send_recv(($value, $value, $value, $value), ($value, $value, $value, $value));
+            test_send_recv(($value, $value, $value, $value, $value), ($value, $value, $value, $value, $value));
+            test_send_recv(($value, $value, $value, $value, $value, $value), ($value, $value, $value, $value, $value, $value));
+            test_send_recv(($value, $value, $value, $value, $value, $value, $value), ($value, $value, $value, $value, $value, $value, $value));
+            test_send_recv(($value, $value, $value, $value, $value, $value, $value, $value), ($value, $value, $value, $value, $value, $value, $value, $value));
         }
     };
 }
 
+#[cfg(feature = "sync")]
 #[test]
 fn test_tuple() {
     test_tuples!(());
@@ -111,11 +131,10 @@ fn test_tuple() {
     test_tuples!("Test String".to_string());
     test_tuples!("Test String".as_bytes().to_vec());
 
-    test_send_recv(&mut (),&vec!["Test".to_string(), "Hello".to_string()], vec!["Test".to_string(), "Hello".to_string()]);
+    test_send_recv(&vec!["Test".to_string(), "Hello".to_string()], vec!["Test".to_string(), "Hello".to_string()]);
 
     let data = ['H', 'e', 'l', 'l', 'o', ' ', 'W', 'o', 'r', 'l', 'd', '!'];
 
-    test_send_recv(&mut (), &data, data);
-    test_send_recv(&mut (), &"Hello".to_string(), "Hello");
-    test_send_recv(&mut (), &"Test String".to_string(), "Test String");
+    test_send_recv(data, data);
+
 }

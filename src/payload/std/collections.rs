@@ -1,96 +1,93 @@
 use std::{borrow::Cow, collections::{BTreeMap, BTreeSet, BinaryHeap, LinkedList, VecDeque}, mem};
 use std::{collections::{HashMap, HashSet}, hash::Hash};
 
-use super::{Error, Middleware, PayloadContext, PayloadHandler, PayloadInfo, Payload, IntoPayload, FromPayload, PayloadConstHash};
+use super::{Error, Middleware, Payload, IntoPayload, FromPayload};
 
-impl<C: PayloadContext, T: IntoPayload<C> + PayloadInfo> IntoPayload<C> for VecDeque<T> {
+impl<C, T: IntoPayload<C>> IntoPayload<C> for VecDeque<T> {
     #[inline]
-    fn into_payload<'b, M: Middleware>(&self, handler: &mut PayloadHandler<'_>, ctx: &mut C, next: &mut M) -> Result<(), Error>{
+    fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
+        next.into_payload(&self.len(), ctx)?;
+
         for item in self {
-            next.into_payload(item, handler, ctx)?;
+            next.into_payload(item, ctx)?;
         }
+
         Ok(())
     }
 }
 
-impl<'a, C: PayloadContext, T: FromPayload<'a, C> + PayloadInfo> FromPayload<'a, C> for VecDeque<T> {
+impl<'a, C, T: FromPayload<'a, C>> FromPayload<'a, C> for VecDeque<T> {
     #[inline]
-    fn from_payload<'b, M: Middleware>(handler: &'b mut PayloadHandler<'a>, ctx: &mut C, next: &mut M) -> Result<Self, Error>
+    fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &mut M) -> Result<Self, Error>
         where 'a: 'b,
     {
         let mut deque = VecDeque::new();
-        while let Ok(item) = next.from_payload::<C, T>(handler, ctx) {
-            deque.push_back(item);
+        let count: usize = next.from_payload(ctx)?;
+
+        for _ in 0..count {
+            deque.push_back(next.from_payload::<C, T>(ctx)?);
         }
+
         Ok(deque)
     }
 }
 
-impl<'a, C: PayloadContext, T: Payload<'a, C> + PayloadInfo> Payload<'a, C> for VecDeque<T> {}
+impl<C, T: Payload<C>> Payload<C> for VecDeque<T> {}
 
-impl<T: PayloadInfo> PayloadInfo for VecDeque<T> {
-    const HASH: u64 = PayloadConstHash(stringify!(VecDeque<T>).as_bytes()) ^ T::HASH;
-    const TYPE: &'static str = "VecDeque<T>";
-    const SIZE: Option<usize> = None;
-}
+impl<C, T: IntoPayload<C>> IntoPayload<C> for LinkedList<T> {
+    fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>{
+        next.into_payload(&self.len(), ctx)?;
 
-impl<C: PayloadContext, T: IntoPayload<C> + PayloadInfo> IntoPayload<C> for LinkedList<T> {
-    fn into_payload<'b, M: Middleware>(&self, handler: &mut PayloadHandler<'_>, ctx: &mut C, next: &mut M) -> Result<(), Error>{
         for item in self {
-            next.into_payload(item, handler, ctx)?;
+            next.into_payload(item, ctx)?;
         }
 
         Ok(())
     }
 }
 
-impl<'a, C: PayloadContext, T: FromPayload<'a, C> + PayloadInfo> FromPayload<'a, C> for LinkedList<T> {
-    fn from_payload<'b, M: Middleware>(handler: &'b mut PayloadHandler<'a>, ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
+impl<'a, C, T: FromPayload<'a, C>> FromPayload<'a, C> for LinkedList<T> {
+    fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
         where 'a: 'b,
     {
         let mut list = LinkedList::new();
+        let count: usize = next.from_payload(ctx)?;
 
-        while let Ok(item) = next.from_payload::<C, T>(handler, ctx) {
-            list.push_back(item);
+        for _ in 0..count {
+            list.push_back(next.from_payload::<C, T>(ctx)?);
         }
 
         Ok(list)
     }
 }
 
-impl<'a, C: PayloadContext, T: Payload<'a, C> + PayloadInfo> Payload<'a, C> for LinkedList<T> {}
+impl<'a, C, T: Payload<C>> Payload<C> for LinkedList<T> {}
 
-impl<T: PayloadInfo> PayloadInfo for LinkedList<T> {
-    const HASH: u64 = PayloadConstHash(stringify!(LinkedList<T>).as_bytes()) ^ T::HASH;
-    const TYPE: &'static str = "LinkedList<T>";
-    const SIZE: Option<usize> = None;
-}
-
-impl<C: PayloadContext, K: IntoPayload<C> + PayloadInfo, V: IntoPayload<C> + PayloadInfo> IntoPayload<C> for HashMap<K, V> {
-    fn into_payload<'b, M: Middleware>(&self, handler: &mut PayloadHandler<'_>, ctx: &mut C, next: &mut M) -> Result<(), Error>{
-        next.into_payload(&self.len(), handler, ctx)?;
+impl<C, K: IntoPayload<C>, V: IntoPayload<C>> IntoPayload<C> for HashMap<K, V> {
+    fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>{
+        next.into_payload(&self.len(), ctx)?;
 
         for (key, value) in self {
-            next.into_payload(key, handler, ctx)?;
-            next.into_payload(value, handler, ctx)?;
+            next.into_payload(key, ctx)?;
+            next.into_payload(value, ctx)?;
         }
 
         Ok(())
     }
 }
 
-impl<'a, C: PayloadContext, K: FromPayload<'a, C> + PayloadInfo, V: FromPayload<'a, C> + PayloadInfo> FromPayload<'a, C> for HashMap<K, V> 
+impl<'a, C, K: FromPayload<'a, C>, V: FromPayload<'a, C>> FromPayload<'a, C> for HashMap<K, V> 
     where K: Hash + Eq 
 {
-    fn from_payload<'b, M: Middleware>(handler: &'b mut PayloadHandler<'a>, ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
+    fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
         where 'a: 'b,
     {
         let mut map = HashMap::new();
-        let count: usize = next.from_payload(handler, ctx)?;
+        let count: usize = next.from_payload(ctx)?;
 
         for _ in 0..count {
-            let key: K = next.from_payload(handler, ctx)?;
-            let value: V = next.from_payload(handler, ctx)?;
+            let key: K = next.from_payload(ctx)?;
+            let value: V = next.from_payload(ctx)?;
 
             map.insert(key, value);
         }
@@ -99,39 +96,34 @@ impl<'a, C: PayloadContext, K: FromPayload<'a, C> + PayloadInfo, V: FromPayload<
     }
 }
 
-impl<'a, C: PayloadContext, K: Payload<'a, C> + PayloadInfo, V: Payload<'a, C> + PayloadInfo> Payload<'a, C> for HashMap<K, V> 
+impl<'a, C, K: Payload<C>, V: Payload<C>> Payload<C> for HashMap<K, V> 
     where K: Hash + Eq {}
 
-impl<K: PayloadInfo, V: PayloadInfo> PayloadInfo for HashMap<K, V> {
-    const HASH: u64 = PayloadConstHash("HashMap<K, V>".as_bytes()) ^ K::HASH ^ V::HASH;
-    const TYPE: &'static str = "HashMap<K, V>";
-}
-
-impl<'a, C: PayloadContext, K: IntoPayload<C> + PayloadInfo, V: IntoPayload<C> + PayloadInfo> IntoPayload<C> for BTreeMap<K, V> {
-    fn into_payload<'b, M: Middleware>(&self, handler: &mut PayloadHandler<'_>, ctx: &mut C, next: &mut M) -> Result<(), Error>{
-        next.into_payload(&self.len(), handler, ctx)?;
+impl<'a, C, K: IntoPayload<C>, V: IntoPayload<C>> IntoPayload<C> for BTreeMap<K, V> {
+    fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>{
+        next.into_payload(&self.len(), ctx)?;
 
         for (key, value) in self {
-            next.into_payload(key, handler, ctx)?;
-            next.into_payload(value, handler, ctx)?;
+            next.into_payload(key, ctx)?;
+            next.into_payload(value, ctx)?;
         }
 
         Ok(())
     }
 }
 
-impl<'a, C: PayloadContext, K: FromPayload<'a, C> + PayloadInfo + Ord, V: FromPayload<'a, C> + PayloadInfo> FromPayload<'a, C> for BTreeMap<K, V> 
+impl<'a, C, K: FromPayload<'a, C> + Ord, V: FromPayload<'a, C>> FromPayload<'a, C> for BTreeMap<K, V> 
     where K: Hash + Eq 
 {
-    fn from_payload<'b, M: Middleware>(handler: &'b mut PayloadHandler<'a>, ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
+    fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
         where 'a: 'b,
     {
         let mut map = BTreeMap::new();
-        let count: usize = next.from_payload(handler, ctx)?;
+        let count: usize = next.from_payload(ctx)?;
 
         for _ in 0..count {
-            let key: K = next.from_payload(handler, ctx)?;
-            let value: V = next.from_payload(handler, ctx)?;
+            let key: K = next.from_payload(ctx)?;
+            let value: V = next.from_payload(ctx)?;
 
             map.insert(key, value);
         }
@@ -140,37 +132,32 @@ impl<'a, C: PayloadContext, K: FromPayload<'a, C> + PayloadInfo + Ord, V: FromPa
     }
 }
 
-impl<'a, C: PayloadContext, K: Payload<'a, C> + PayloadInfo, V: Payload<'a, C> + PayloadInfo> Payload<'a, C> for BTreeMap<K, V> 
+impl<C, K: Payload<C>, V: Payload<C>> Payload<C> for BTreeMap<K, V> 
     where K: Hash + Eq + Ord {}
 
-impl<K: PayloadInfo, V: PayloadInfo> PayloadInfo for BTreeMap<K, V> {
-    const HASH: u64 = PayloadConstHash("BTreeMap<K, V>".as_bytes()) ^ K::HASH ^ V::HASH;
-    const TYPE: &'static str = "BTreeMap<K, V>";
-}
-
-impl<'a, C: PayloadContext, K: IntoPayload<C> + PayloadInfo> IntoPayload<C> for HashSet<K> {
-    fn into_payload<'b, M: Middleware>(&self, handler: &mut PayloadHandler<'_>, ctx: &mut C, next: &mut M) -> Result<(), Error>{
-        next.into_payload(&self.len(), handler, ctx)?;
+impl<'a, C, K: IntoPayload<C>> IntoPayload<C> for HashSet<K> {
+    fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>{
+        next.into_payload(&self.len(), ctx)?;
 
         for key in self {
-            next.into_payload(key, handler, ctx)?;
+            next.into_payload(key, ctx)?;
         }
 
         Ok(())
     }
 }
 
-impl<'a, C: PayloadContext, K: FromPayload<'a, C> + PayloadInfo> FromPayload<'a, C> for HashSet<K> 
+impl<'a, C, K: FromPayload<'a, C>> FromPayload<'a, C> for HashSet<K> 
     where K: Hash + Eq 
 {    
-    fn from_payload<'b, M: Middleware>(handler: &'b mut PayloadHandler<'a>, ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
+    fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
         where 'a: 'b,
     {
         let mut set = HashSet::new();
-        let count: usize = next.from_payload(handler, ctx)?;
+        let count: usize = next.from_payload(ctx)?;
 
         for _ in 0..count {
-            let key: K = next.from_payload(handler, ctx)?;
+            let key: K = next.from_payload(ctx)?;
 
             set.insert(key);
         }
@@ -179,37 +166,32 @@ impl<'a, C: PayloadContext, K: FromPayload<'a, C> + PayloadInfo> FromPayload<'a,
     }
 }
 
-impl<'a, C: PayloadContext, K: Payload<'a, C> + PayloadInfo> Payload<'a, C> for HashSet<K> 
+impl<C, K: Payload<C>> Payload<C> for HashSet<K> 
     where K: Hash + Eq {}
 
-impl<K: PayloadInfo> PayloadInfo for HashSet<K> {
-    const HASH: u64 = PayloadConstHash("HashSet<K>".as_bytes()) ^ K::HASH;
-    const TYPE: &'static str = "HashSet<K>";
-}
-
-impl<'a, C: PayloadContext, K: IntoPayload<C> + PayloadInfo> IntoPayload<C> for BTreeSet<K> {
-    fn into_payload<'b, M: Middleware>(&self, handler: &mut PayloadHandler<'_>, ctx: &mut C, next: &mut M) -> Result<(), Error>{
-        next.into_payload(&self.len(), handler, ctx)?;
+impl<'a, C, K: IntoPayload<C>> IntoPayload<C> for BTreeSet<K> {
+    fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>{
+        next.into_payload(&self.len(), ctx)?;
 
         for key in self {
-            next.into_payload(key, handler, ctx)?;
+            next.into_payload(key, ctx)?;
         }
 
         Ok(())
     }
 }
 
-impl<'a, C: PayloadContext, K: FromPayload<'a, C> + PayloadInfo> FromPayload<'a, C> for BTreeSet<K> 
+impl<'a, C, K: FromPayload<'a, C>> FromPayload<'a, C> for BTreeSet<K> 
     where K: Hash + Eq + Ord
 {    
-    fn from_payload<'b, M: Middleware>(handler: &'b mut PayloadHandler<'a>, ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
+    fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
         where 'a: 'b,
     {
         let mut set = BTreeSet::new();
-        let count: usize = next.from_payload(handler, ctx)?;
+        let count: usize = next.from_payload(ctx)?;
 
         for _ in 0..count {
-            let key: K = next.from_payload(handler, ctx)?;
+            let key: K = next.from_payload(ctx)?;
 
             set.insert(key);
         }
@@ -218,101 +200,89 @@ impl<'a, C: PayloadContext, K: FromPayload<'a, C> + PayloadInfo> FromPayload<'a,
     }
 }
 
-impl<'a, C: PayloadContext, K: Payload<'a, C> + PayloadInfo> Payload<'a, C> for BTreeSet<K> 
+impl<C, K: Payload<C>> Payload<C> for BTreeSet<K> 
     where K: Hash + Eq + Ord {}
 
-impl<K: PayloadInfo> PayloadInfo for BTreeSet<K> {
-    const HASH: u64 = PayloadConstHash("BTreeSet<K>".as_bytes()) ^ K::HASH;
-    const TYPE: &'static str = "BTreeSet<K>";
-}
 
-impl<'a, C: PayloadContext, T: IntoPayload<C> + PayloadInfo + Ord> IntoPayload<C> for BinaryHeap<T> {
-    fn into_payload<'b, M: Middleware>(&self, handler: &mut PayloadHandler<'_>, ctx: &mut C, next: &mut M) -> Result<(), Error>{
+impl<'a, C, T: IntoPayload<C> + Ord> IntoPayload<C> for BinaryHeap<T> {
+    fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
+        next.into_payload(&self.len(), ctx)?;
+
         for item in self {
-            next.into_payload(item, handler, ctx)?;
+            next.into_payload(item, ctx)?;
         }
 
         Ok(())
     }
 }
 
-impl<'a, C: PayloadContext, T: FromPayload<'a, C> + PayloadInfo + Ord> FromPayload<'a, C> for BinaryHeap<T> {
-    fn from_payload<'b, M: Middleware>(handler: &'b mut PayloadHandler<'a>, ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
+impl<'a, C, T: FromPayload<'a, C> + Ord> FromPayload<'a, C> for BinaryHeap<T> {
+    fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
         where 'a: 'b,
     {
         let mut heap = BinaryHeap::new();
+        let count: usize = next.from_payload(ctx)?;
 
-        while let Ok(item) = next.from_payload::<C, T>(handler, ctx) {
-            heap.push(item);
+        for _ in 0..count {
+            heap.push(next.from_payload::<C, T>(ctx)?);
         }
 
         Ok(heap)
     }
 }
 
-impl<'a, C: PayloadContext, T: Payload<'a, C> + PayloadInfo + Ord> Payload<'a, C> for BinaryHeap<T> {}
+impl<C, T: Payload<C> + Ord> Payload<C> for BinaryHeap<T> {}
 
-impl<T: PayloadInfo + Ord> PayloadInfo for BinaryHeap<T> {
-    const HASH: u64 = PayloadConstHash(stringify!(BinaryHeap<T>).as_bytes()) ^ T::HASH;
-    const TYPE: &'static str = "BinaryHeap<T>";
-    const SIZE: Option<usize> = None;
-}
-
-impl<'a, C: PayloadContext, T: IntoPayload<C> + PayloadInfo> IntoPayload<C> for Vec<T> {
+impl<'a, C, T: IntoPayload<C>> IntoPayload<C> for Vec<T> {
     #[inline]
-    fn into_payload<'b, M: Middleware>(&self, handler: &mut PayloadHandler<'_>, ctx: &mut C, next: &mut M) -> Result<(), Error>{
-        next.into_payload(&self.as_slice(), handler, ctx)
+    fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>{
+        next.into_payload(&self.as_slice(), ctx)
     }
 }
 
-impl<'a, C: PayloadContext, T: FromPayload<'a, C> + PayloadInfo> FromPayload<'a, C> for Vec<T> 
+impl<'a, C, T: FromPayload<'a, C>> FromPayload<'a, C> for Vec<T> 
     where T: Clone + 'a 
 {
     #[inline]
-    fn from_payload<'b, M: Middleware>(handler: &'b mut PayloadHandler<'a>, ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
+    fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
         where 'a: 'b,
     {
-        Ok(Vec::from(next.from_payload::<C, Cow<'a, [T]>>(handler, ctx)?.into_owned()))
+        Ok(Vec::from(next.from_payload::<C, Cow<'a, [T]>>(ctx)?.into_owned()))
     }
 }
 
-impl<'a, C: PayloadContext, T: Payload<'a, C> + PayloadInfo> Payload<'a, C> for Vec<T> 
-    where T: Clone + 'a {}
+impl<C, T: Payload<C>> Payload<C> for Vec<T> 
+    where T: Clone {}
 
-impl<T: PayloadInfo> PayloadInfo for Vec<T> {
-    const HASH: u64 = PayloadConstHash(stringify!(&[T]).as_bytes()) ^ T::HASH;
-    const TYPE: &'static str = "Vec<T>";
-}
-
-impl<'a, C: PayloadContext, T: IntoPayload<C> + PayloadInfo> IntoPayload<C> for Cow<'_, [T]> 
+impl<'a, C, T: IntoPayload<C>> IntoPayload<C> for Cow<'a, [T]> 
     where T: Clone 
 {
-    fn into_payload<'b, M: Middleware>(&self, handler: &mut PayloadHandler<'_>, ctx: &mut C, next: &mut M) -> Result<(), Error>{
+    fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>{
         if mem::size_of::<T>() == 1 {
             match self {
                 Cow::Borrowed(slice) => {
-                    next.into_payload(&slice.len(), handler, ctx)?;
-                    next.write(handler, slice)?;
+                    next.into_payload(&slice.len(), ctx)?;
+                    next.write(slice)?;
                 }
                 Cow::Owned(vec) => {
-                    next.into_payload(&vec.len(), handler, ctx)?;
-                    next.write(handler, &vec)?;
+                    next.into_payload(&vec.len(), ctx)?;
+                    next.write(&vec)?;
                 }
             }
         } else {
             match self {
                 Cow::Borrowed(slice) => {
-                    next.into_payload(&slice.len(), handler, ctx)?;
+                    next.into_payload(&slice.len(), ctx)?;
 
                     for elem in *slice {
-                        next.into_payload(elem, handler, ctx)?;
+                        next.into_payload(elem, ctx)?;
                     }
                 }
                 Cow::Owned(vec) => {
-                    next.into_payload(&vec.len(), handler, ctx)?;
+                    next.into_payload(&vec.len(), ctx)?;
 
                     for elem in vec {
-                        next.into_payload(elem, handler, ctx)?;
+                        next.into_payload(elem, ctx)?;
                     }
                 }
             }
@@ -322,21 +292,21 @@ impl<'a, C: PayloadContext, T: IntoPayload<C> + PayloadInfo> IntoPayload<C> for 
     }
 }
 
-impl<'a, C: PayloadContext, T: FromPayload<'a, C> + PayloadInfo> FromPayload<'a, C> for Cow<'a, [T]> 
+impl<'a, C, T: FromPayload<'a, C>> FromPayload<'a, C> for Cow<'a, [T]> 
     where T: Clone 
 {
-    fn from_payload<'b, M: Middleware>(handler: &'b mut PayloadHandler<'a>, ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
+    fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
         where 'a: 'b,
     {
-        let len: usize = next.from_payload(handler, ctx)?;
+        let len: usize = next.from_payload(ctx)?;
 
         if mem::size_of::<T>() == 1 {
-            Ok(Cow::Borrowed(next.read(handler, len)?))
+            Ok(Cow::Borrowed(next.read(len)?))
         } else {
             let mut vec = Vec::with_capacity(len);
 
             for _ in 0..len {
-                vec.push(next.from_payload::<C, T>(handler, ctx)?);
+                vec.push(next.from_payload::<C, T>(ctx)?);
             }
 
             Ok(Cow::Owned(vec))
@@ -344,12 +314,5 @@ impl<'a, C: PayloadContext, T: FromPayload<'a, C> + PayloadInfo> FromPayload<'a,
     }
 }
 
-impl<'a, C: PayloadContext, T: Payload<'a, C> + PayloadInfo> Payload<'a, C> for Cow<'a, [T]> 
+impl<'a, C, T: Payload<C>> Payload<C> for Cow<'a, [T]> 
     where T: Clone {}
-
-impl<'a, T: PayloadInfo> PayloadInfo for Cow<'a, [T]>  
-    where T: Clone
-{
-    const HASH: u64 = PayloadConstHash(stringify!(&[T]).as_bytes()) ^ T::HASH;
-    const TYPE: &'static str = "Cow";
-}
