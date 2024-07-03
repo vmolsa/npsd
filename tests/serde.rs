@@ -2,28 +2,46 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use std::{collections::{HashMap, HashSet}, net::SocketAddr, time::Instant};
 
-use npsd::{Bitmap, Payload, Schema};
+use npsd::Info;
 
-#[derive(Schema, Serialize, Deserialize, PartialEq, Debug)]
+#[cfg(feature = "sync")]
+use npsd::{Bitmap, Schema, Payload};
+
+#[cfg(feature = "async")]
+use npsd::{AsyncBitmap, AsyncSchema, AsyncPayload, Error};
+
+#[cfg_attr(feature = "async", derive(AsyncSchema))]
+#[cfg_attr(feature = "sync", derive(Schema))]
+#[derive(Info, Serialize, Deserialize, PartialEq, Debug)]
 struct TupleStruct(u64, usize, String);
 
-#[derive(Schema, Serialize, Deserialize, PartialEq, Debug)]
+#[cfg_attr(feature = "async", derive(AsyncSchema))]
+#[cfg_attr(feature = "sync", derive(Schema))]
+#[derive(Info, Serialize, Deserialize, PartialEq, Debug)]
 struct Color {
     r: u8,
     g: u8,
     b: u8,
 }
 
-#[derive(Schema, Serialize, Deserialize, PartialEq, Debug)]
+#[cfg_attr(feature = "async", derive(AsyncSchema))]
+#[cfg_attr(feature = "sync", derive(Schema))]
+#[derive(Info, Serialize, Deserialize, PartialEq, Debug)]
 struct Point2D(f32, f64);
 
-#[derive(Schema, Serialize, Deserialize, PartialEq, Debug)]
+#[cfg_attr(feature = "async", derive(AsyncSchema))]
+#[cfg_attr(feature = "sync", derive(Schema))]
+#[derive(Info, Serialize, Deserialize, PartialEq, Debug)]
 struct Inches(u64);
 
-#[derive(Schema, Serialize, Deserialize, PartialEq, Debug)]
+#[cfg_attr(feature = "async", derive(AsyncSchema))]
+#[cfg_attr(feature = "sync", derive(Schema))]
+#[derive(Info, Serialize, Deserialize, PartialEq, Debug)]
 struct Instance;
 
-#[derive(Schema, Serialize, Deserialize, PartialEq, Debug)]
+#[cfg_attr(feature = "async", derive(AsyncSchema))]
+#[cfg_attr(feature = "sync", derive(Schema))]
+#[derive(Info, Serialize, Deserialize, PartialEq, Debug)]
 enum E {
     // Use three-step process:
     //   1. serialize_struct_variant
@@ -44,7 +62,9 @@ enum E {
     Instance,
 }
 
-#[derive(Schema, Serialize, Deserialize, PartialEq, Debug)]
+#[cfg_attr(feature = "async", derive(AsyncSchema))]
+#[cfg_attr(feature = "sync", derive(Schema))]
+#[derive(Info, Serialize, Deserialize, PartialEq, Debug)]
 struct User {
     name: String,
     email: String,
@@ -52,12 +72,16 @@ struct User {
     postal: u16,
 }
 
-#[derive(Schema, Serialize, Deserialize, PartialEq, Debug)]
+#[cfg_attr(feature = "async", derive(AsyncSchema))]
+#[cfg_attr(feature = "sync", derive(Schema))]
+#[derive(Info, Serialize, Deserialize, PartialEq, Debug)]
 pub struct GenericStruct<T> {
     x: T,
 }
 
-#[derive(Schema, Serialize, Deserialize, PartialEq, Debug)]
+#[cfg_attr(feature = "async", derive(AsyncSchema))]
+#[cfg_attr(feature = "sync", derive(Schema))]
+#[derive(Info, Serialize, Deserialize, PartialEq, Debug)]
 enum Animal {
     Dog,
     Frog(String, Vec<isize>),
@@ -65,19 +89,25 @@ enum Animal {
     AntHive(Vec<String>),
 }
 
-#[derive(Schema, Serialize, Deserialize, PartialEq, Debug, Clone)]
+#[cfg_attr(feature = "async", derive(AsyncSchema))]
+#[cfg_attr(feature = "sync", derive(Schema))]
+#[derive(Info, Serialize, Deserialize, PartialEq, Debug, Clone)]
 struct Inner {
     a: (),
     b: usize,
     c: Vec<String>,
 }
 
-#[derive(Schema, Serialize, Deserialize, PartialEq, Debug)]
+#[cfg_attr(feature = "async", derive(AsyncSchema))]
+#[cfg_attr(feature = "sync", derive(Schema))]
+#[derive(Info, Serialize, Deserialize, PartialEq, Debug)]
 struct Outer {
     inner: Vec<Inner>,
 }
 
-#[derive(Bitmap, Serialize, Deserialize, PartialEq, Debug)]
+#[cfg_attr(feature = "async", derive(AsyncBitmap))]
+#[cfg_attr(feature = "sync", derive(Bitmap))]
+#[derive(Info, Serialize, Deserialize, PartialEq, Debug)]
 struct Flags {
     opt0: bool,
     opt1: bool,
@@ -89,13 +119,17 @@ struct Flags {
     opt7: bool,
 }
 
-#[derive(Schema, Serialize, Deserialize, Clone, PartialEq, Debug)]
+#[cfg_attr(feature = "async", derive(AsyncSchema))]
+#[cfg_attr(feature = "sync", derive(Schema))]
+#[derive(Info, Serialize, Deserialize, Clone, PartialEq, Debug)]
 struct MapSet {
     map1: HashMap<String, u32>,
     set1: HashSet<String>,
 }
 
-#[derive(Schema, Serialize, Deserialize, PartialEq, Debug)]
+#[cfg_attr(feature = "async", derive(AsyncSchema))]
+#[cfg_attr(feature = "sync", derive(Schema))]
+#[derive(Info, Serialize, Deserialize, PartialEq, Debug)]
 struct T<'a> {
     field_name1: i32,
     field_name2: String,
@@ -119,6 +153,7 @@ struct T<'a> {
     field_name20: MapSet,
 }
 
+#[cfg(feature = "sync")]
 #[test]
 fn serde_test() {
     const TEST_REPEAT: usize = 10000;
@@ -216,9 +251,15 @@ fn serde_test() {
 
     let start = Instant::now();
 
+    let mut ctx = ();
+
     for _ in 0..TEST_REPEAT {
-        let serialized = t.into_packet(&mut (), 1470).unwrap();    
-        let deserialized = T::from_packet(&mut (), &serialized).unwrap();
+        use npsd::Next;
+
+        let mut next = Next::default();
+
+        t.into_packet(&mut ctx, &mut next).unwrap();    
+        let deserialized = T::from_packet(&mut ctx, &mut next).unwrap();
 
         assert_eq!(deserialized, t);
     }
@@ -229,6 +270,7 @@ fn serde_test() {
 
 }
 
+#[cfg(feature = "sync")]
 #[test]
 fn serde_serialize_test() {
     const TEST_REPEAT: usize = 10000;
@@ -319,7 +361,9 @@ fn serde_serialize_test() {
     let start = Instant::now();
 
     for _ in 0..TEST_REPEAT {
-        let _serialized = t.into_packet(&mut (), 1470).unwrap();
+        use npsd::Next;
+
+        let _serialized = t.into_packet(&mut (), &mut Next::default()).unwrap();
     }
 
     let duration = start.elapsed();

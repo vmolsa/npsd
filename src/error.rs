@@ -1,10 +1,29 @@
+#[doc(hidden)]
+#[cfg(feature = "sync")]
 use npsd_schema::SchemaInternal as Schema;
+
+#[doc(hidden)]
+#[cfg(feature = "async")]
+use npsd_schema::AsyncSchemaInternal as AsyncSchema;
+
+#[doc(hidden)]
+use npsd_schema::InfoInternal as Info;
+
+#[doc(hidden)]
+use crate::PayloadInfo;
+
 #[doc(hidden)]
 use thiserror::Error as AsError;
 
-use crate::{PayloadContext, Middleware, PayloadInfo, IntoPayload, FromPayload, Payload, PayloadHandler, PayloadConstHash};
+#[cfg(feature = "sync")]
+use crate::{Middleware, Payload, IntoPayload, FromPayload};
 
-#[derive(Schema, Clone, AsError, PartialEq, Debug)]
+#[cfg(feature = "async")]
+use crate::{AsyncMiddleware, AsyncPayload, AsyncIntoPayload, AsyncFromPayload};
+
+#[cfg_attr(feature = "async", derive(AsyncSchema))]
+#[cfg_attr(feature = "sync", derive(Schema))]
+#[derive(Clone, Info, AsError, PartialEq, Debug)]
 pub enum Error {
     #[error("Invalid length: expected `{expected}`, found `{found}`")]
     InvalidLength {

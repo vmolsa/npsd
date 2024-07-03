@@ -1,48 +1,37 @@
-use super::{Error, PayloadContext, PayloadHandler, PayloadInfo, Payload, IntoPayload, FromPayload, Middleware, helper::size_array};
+use super::{Error, Payload, IntoPayload, FromPayload, Middleware};
 
 #[macro_export]
 macro_rules! payload_tuple {
     (($(($T:ident, $i:tt)),+), $len:tt) => {
-        impl<X: PayloadContext, $($T),+> IntoPayload<X> for ($($T,)+) 
+        impl<X, $($T),+> IntoPayload<X> for ($($T,)+) 
             where
-                $($T: IntoPayload<X> + PayloadInfo,)+
+                $($T: IntoPayload<X>,)+
         {
-            fn into_payload<'b, Y: Middleware>(&'b self, handler: &mut PayloadHandler<'_>, ctx: &mut X, next: &mut Y) -> Result<(), Error> {
+            fn into_payload<Y: Middleware>(&self, ctx: &mut X, next: &mut Y) -> Result<(), Error> {
                 $(
-                    next.into_payload(&self.$i, handler, ctx)?;
+                    next.into_payload(&self.$i, ctx)?;
                 )+
 
                 Ok(())
             }
         }
 
-        impl<'a, X: PayloadContext, $($T),+> FromPayload<'a, X> for ($($T,)+) 
+        impl<'a, X, $($T),+> FromPayload<'a, X> for ($($T,)+) 
             where
-                $($T: FromPayload<'a, X> + PayloadInfo,)+
+                $($T: FromPayload<'a, X>,)+
         {
-            fn from_payload<'b, Y: Middleware>(handler: &'b mut PayloadHandler<'a>, ctx: &mut X, next: &'b mut Y) -> Result<Self, Error>
+            fn from_payload<'b, Y: Middleware>(ctx: &mut X, next: &'b mut Y) -> Result<Self, Error>
                 where 'a: 'b,
             {
                 Ok(($(
-                    next.from_payload::<X, $T>(handler, ctx)?,
+                    next.from_payload::<X, $T>(ctx)?,
                 )+))
             }
         }
 
-        impl<'a, X: PayloadContext, $($T),+> Payload<'a, X> for ($($T,)+) 
+        impl<X, $($T),+> Payload<X> for ($($T,)+) 
             where
-                $($T: Payload<'a, X> + PayloadInfo,)+ {}
-
-        impl<'a, $($T),+> PayloadInfo for ($($T,)+) 
-            where
-                $($T: PayloadInfo,)+
-        {
-            const HASH: u64 = 0 $( ^ <$T>::HASH )+;
-            const TYPE: &'static str = "tuple";
-            const SIZE: Option<usize> = size_array([$(
-                <$T>::SIZE
-            ),+]);
-        }
+                $($T: Payload<X>,)+ {}
     };
 }
 

@@ -1,11 +1,11 @@
 #[cfg(feature = "chrono")]
-use npsd::{Payload, Schema};
+use npsd::{Payload, Schema, Info};
 
 #[cfg(feature = "chrono")]
 use chrono::{/* NaiveDate, NaiveDateTime, NaiveTime, */ Utc, Local, DateTime, FixedOffset, TimeZone};
 
 #[cfg(feature = "chrono")]
-#[derive(Schema, Clone, PartialEq, Debug)]
+#[derive(Schema, Info, Clone, PartialEq, Debug)]
 struct ChronoTime {
     date0: DateTime<Utc>,
     date1: DateTime<Local>,
@@ -20,6 +20,21 @@ struct ChronoTime {
 fn test_chrono_payload() {
     use pretty_hex::PrettyHex;
 
+    #[cfg(feature = "info")]
+    use npsd::NextTrace;
+
+    #[cfg(not(feature = "info"))]
+    use npsd::Next;
+
+    let mut ctx = ();
+
+    // Create Middleware
+    #[cfg(not(feature = "info"))]
+    let mut next = Next::default();
+
+    #[cfg(feature = "info")]
+    let mut next = NextTrace::default();
+
     let instance = ChronoTime {
         date0: Utc.timestamp_opt(61, 0).unwrap(),
         date1: Utc::now().with_timezone(&Local),
@@ -29,11 +44,11 @@ fn test_chrono_payload() {
         // date5: NaiveDateTime::new(NaiveDate::from_ymd_opt(2024, 6, 29).unwrap(), NaiveTime::from_hms_opt(12, 34, 56).unwrap()), // TODO(): Not implemented
     };
 
-    let serialized = instance.into_packet(&mut (), 1470).unwrap();
+    instance.into_packet(&mut ctx, &mut next).unwrap();
 
-    println!("Encoded: {:?}", serialized.hex_dump());
+    println!("Encoded: {:?}", next.serialized().hex_dump());
 
-    let deserialized = ChronoTime::from_packet(&mut (), &serialized).unwrap();
+    let deserialized = ChronoTime::from_packet(&mut ctx, &mut next).unwrap();
 
     assert_eq!(instance, deserialized);
 }

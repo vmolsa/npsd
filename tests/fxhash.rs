@@ -1,11 +1,11 @@
 #[cfg(feature = "fxhash")]
-use npsd::{Payload, Schema};
+use npsd::{Payload, Schema, Info};
 
 #[cfg(feature = "fxhash")]
 use fxhash::*;
 
 #[cfg(feature = "chrono")]
-#[derive(Schema, Clone, PartialEq, Debug)]
+#[derive(Schema, Info, Clone, PartialEq, Debug)]
 struct FxMapSet {
     map1: FxHashMap<String, u32>,
     set1: FxHashSet<String>,
@@ -15,6 +15,21 @@ struct FxMapSet {
 #[test]
 fn test_chrono_payload() {
     use pretty_hex::PrettyHex;
+
+    #[cfg(feature = "info")]
+    use npsd::NextTrace;
+
+    #[cfg(not(feature = "info"))]
+    use npsd::Next;
+
+    let mut ctx = ();
+
+    // Create Middleware
+    #[cfg(not(feature = "info"))]
+    let mut next = Next::default();
+
+    #[cfg(feature = "info")]
+    let mut next = NextTrace::default();
 
     let instance = FxMapSet {
         map1: FxHashMap::from(vec![
@@ -31,11 +46,11 @@ fn test_chrono_payload() {
         ].into_iter().collect()),
     };
 
-    let serialized = instance.into_packet(&mut (), 1470).unwrap();
+    instance.into_packet(&mut ctx, &mut next).unwrap();
 
-    println!("Encoded: {:?}", serialized.hex_dump());
+    println!("Encoded: {:?}", next.serialized().hex_dump());
 
-    let deserialized = FxMapSet::from_packet(&mut (), &serialized).unwrap();
+    let deserialized = FxMapSet::from_packet(&mut ctx, &mut next).unwrap();
 
     assert_eq!(instance, deserialized);
 }

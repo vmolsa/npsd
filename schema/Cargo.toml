@@ -1,14 +1,15 @@
 [package]
 name = "npsd-schema"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 license = "Apache-2.0"
-description = "Implementation of #[derive(Schema, Bitmap)]"
+description = "Implementation of #[derive(Schema, Bitmap, AsyncSchema, AsyncBitmap, Info)]"
 repository = "https://github.com/vmolsa/npsd"
 documentation = "https://docs.rs/npsd"
 categories = ["network-programming"]
 keywords = ["serialize", "deserialize"]
 workspace = ".."
+readme = "README.md"
 
 [lib]
 name = "npsd_schema"
