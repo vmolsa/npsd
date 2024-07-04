@@ -190,6 +190,11 @@ impl<'a> Next<'a> {
     pub fn serialized(&self) -> Vec<u8> {
         self.0.to_vec()
     }
+
+    #[inline(always)]
+    pub fn as_slice(&'a self) -> &'a [u8] { 
+        self.0.as_ref()
+    }
 }
 
 impl<'a> Default for Next<'a> {
@@ -227,6 +232,11 @@ impl<'a> NextTrace<'a> {
     #[inline(always)]
     pub fn serialized(&self) -> Vec<u8> {
         self.0.to_vec()
+    }
+
+    #[inline(always)]
+    pub fn as_slice(&'a self) -> &'a [u8] { 
+        self.0.as_ref()
     }
 }
 
