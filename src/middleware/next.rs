@@ -182,6 +182,10 @@ impl CowRw for Cow<'_, [u8]> {
 pub struct Next<'a>(Cow<'a, [u8]>);
 
 impl<'a> Next<'a> {
+    pub fn from_mut(cow: &'a mut Cow<'_, [u8]>) -> Self {
+        Self(Cow::Borrowed(&*cow))
+    }
+
     pub fn with_mtu(mtu: usize) -> Self {
         Self(Cow::from(Vec::with_capacity(mtu)))
     }
@@ -221,6 +225,10 @@ const MAX_NESTED_DEPTH: usize = 255;
 
 #[cfg(feature = "info")]
 impl<'a> NextTrace<'a> {
+    pub fn from_mut(cow: &'a mut Cow<'_, [u8]>) -> Self {
+        Self(Cow::Borrowed(&*cow), MAX_NESTED_DEPTH, LinkedList::new())
+    }
+
     pub fn with_mtu(mtu: usize) -> Self {
         Self(Cow::from(Vec::with_capacity(mtu)), MAX_NESTED_DEPTH, LinkedList::new())
     }
