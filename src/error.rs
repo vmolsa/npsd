@@ -53,5 +53,8 @@ pub enum Error {
     Time(String),
 
     #[error("Traced error: `{0}`, path: `{1}`")]
-    Traced(String, String)
+    Traced(String, String),
+
+    #[error("External error: {0}")]
+    External(String),
 }
