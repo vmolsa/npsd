@@ -2,7 +2,7 @@
 
 | Type                    | Sync Methods                      | Async Methods                                    | Metadata (PayloadInfo)   |
 |:------------------------|:----------------------------------|:-------------------------------------------------|:-------------------------|
-| Next`<'_>`                | Middleware                        | AsyncMiddleware                                  |                          |
+| Next`<'_>`              | Middleware                        | AsyncMiddleware                                  |                          |
 | u8                      | IntoPayload, FromPayload, Payload | AsyncIntoPayload, AsyncFromPayload, AsyncPayload | Yes                      |
 | u16                     | IntoPayload, FromPayload, Payload | AsyncIntoPayload, AsyncFromPayload, AsyncPayload | Yes                      |
 | u32                     | IntoPayload, FromPayload, Payload | AsyncIntoPayload, AsyncFromPayload, AsyncPayload | Yes                      |
@@ -59,5 +59,5 @@
 | SocketAddr              | IntoPayload, FromPayload, Payload | AsyncIntoPayload, AsyncFromPayload, AsyncPayload | Yes                      |
 | Uuid                    | IntoPayload, FromPayload, Payload | AsyncIntoPayload, AsyncFromPayload, AsyncPayload | Yes                      |
 | Duration                | IntoPayload, FromPayload, Payload | AsyncIntoPayload, AsyncFromPayload, AsyncPayload | Yes                      |
-| Instant                 | IntoPayload                       | AsyncIntoPayload                                 | Yes                      |
+| Instant                 | IntoPayload, `TODO`               | AsyncIntoPayload, `TODO`                         | Yes                      |
 | SystemTime              | IntoPayload, FromPayload, Payload | AsyncIntoPayload, AsyncFromPayload, AsyncPayload | Yes                      |
