@@ -24,7 +24,7 @@
 | String                  | IntoPayload, FromPayload, Payload | AsyncIntoPayload, AsyncFromPayload, AsyncPayload | Yes                      |
 | Option`<T>`             | IntoPayload, FromPayload, Payload | AsyncIntoPayload, AsyncFromPayload, AsyncPayload | Yes                      |
 | Result`<T, E>`          | IntoPayload, FromPayload, Payload | AsyncIntoPayload, AsyncFromPayload, AsyncPayload | Yes                      |
-| *mut T                  | IntoPayload, FromPayload, Payload |                                                  | Yes                      |
+| *mut T                  | IntoPayload, FromPayload, Payload | `(Disabled for Send + Sync)`                     | Yes                      |
 | &'a T                   | IntoPayload, FromPayload, Payload | AsyncIntoPayload, AsyncFromPayload, AsyncPayload | Yes                      |
 | &'a mut T               | IntoPayload, FromPayload, Payload | AsyncIntoPayload, AsyncFromPayload, AsyncPayload | Yes                      |
 | Vec`<T>`                | IntoPayload, FromPayload, Payload | AsyncIntoPayload, AsyncFromPayload, AsyncPayload | Yes                      |
@@ -34,11 +34,11 @@
 | `[T; N]`                | IntoPayload, FromPayload, Payload | AsyncIntoPayload, AsyncFromPayload, AsyncPayload | Yes                      |
 | Box`<T>`                | IntoPayload, FromPayload, Payload | AsyncIntoPayload, AsyncFromPayload, AsyncPayload | Yes                      |
 | Arc`<T>`                | IntoPayload, FromPayload, Payload | AsyncIntoPayload, AsyncFromPayload, AsyncPayload | Yes                      |
-| Rc`<T>`                 | IntoPayload, FromPayload, Payload |                                                  | Yes                      |
-| UnsafeCell`<T>`         | IntoPayload, FromPayload, Payload |                                                  | Yes                      |
-| Cell`<T>`               | IntoPayload, FromPayload, Payload |                                                  | Yes                      |
-| Ref`<'a, T>`            | IntoPayload, FromPayload, Payload |                                                  | Yes                      |
-| RefCell`<T>`            | IntoPayload, FromPayload, Payload |                                                  | Yes                      |
+| Rc`<T>`                 | IntoPayload, FromPayload, Payload | `(Disabled for Send + Sync)`                     | Yes                      |
+| UnsafeCell`<T>`         | IntoPayload, FromPayload, Payload | `(Disabled for Send + Sync)`                     | Yes                      |
+| Cell`<T>`               | IntoPayload, FromPayload, Payload | `(Disabled for Send + Sync)`                     | Yes                      |
+| Ref`<'a, T>`            | IntoPayload, FromPayload, Payload | `(Disabled for Send + Sync)`                     | Yes                      |
+| RefCell`<T>`            | IntoPayload, FromPayload, Payload | `(Disabled for Send + Sync)`                     | Yes                      |
 | Pin<Box`<T>`>           | IntoPayload, FromPayload, Payload | AsyncIntoPayload, AsyncFromPayload, AsyncPayload | Yes                      |
 | Weak`<T>`               | IntoPayload, FromPayload, Payload | AsyncIntoPayload, AsyncFromPayload, AsyncPayload | Yes                      |
 | VecDeque`<T>`           | IntoPayload, FromPayload, Payload | AsyncIntoPayload, AsyncFromPayload, AsyncPayload | Yes                      |
