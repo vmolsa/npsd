@@ -61,3 +61,5 @@
 | Duration                | IntoPayload, FromPayload, Payload | AsyncIntoPayload, AsyncFromPayload, AsyncPayload | Yes                      |
 | Instant                 | IntoPayload, `TODO`               | AsyncIntoPayload, `TODO`                         | Yes                      |
 | SystemTime              | IntoPayload, FromPayload, Payload | AsyncIntoPayload, AsyncFromPayload, AsyncPayload | Yes                      |
+| io::`Error`             | IntoPayload, FromPayload, Payload | AsyncIntoPayload, AsyncFromPayload, AsyncPayload | Yes                      |
+
