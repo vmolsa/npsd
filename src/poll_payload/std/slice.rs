@@ -1,5 +1,4 @@
-use core::{mem, slice};
-use std::borrow::Cow;
+use core::mem;
 
 use super::{Error, AsyncMiddleware, AsyncPayload, AsyncIntoPayload, AsyncFromPayload};
 
@@ -55,15 +54,9 @@ impl<'a, C: Send + Sync, T: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for
         where 'a: 'b,
     {
         if mem::size_of::<T>() == 1 {
-            let mut slice: Cow<'a, [T]> = next.poll_from_payload(ctx).await?;
+            let nbytes: usize = next.poll_from_payload(ctx).await?;
 
-            let result = unsafe {
-                slice::from_raw_parts_mut(slice.to_mut().as_mut_ptr() as *mut T, slice.len())
-            };
-
-            mem::forget(slice);
-
-            Ok(result)
+            next.poll_read_mut(nbytes).await
         } else {
             let len: usize = next.poll_from_payload(ctx).await?;
             let mut vec = Vec::with_capacity(len);

@@ -53,16 +53,12 @@ impl<'a, C, T: FromPayload<'a, C>> FromPayload<'a, C> for &'a mut [T] where T: C
     fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
         where 'a: 'b,
     {
-        let len: usize = next.from_payload(ctx)?;
-
         if mem::size_of::<T>() == 1 {
-            next.read_mut(len)
-        } else {
-            let mut vec = Vec::with_capacity(len);
+            let nbytes: usize = next.from_payload(ctx)?;
 
-            for _ in 0..len {
-                vec.push(next.from_payload::<C, T>(ctx)?);
-            }
+            next.read_mut(nbytes)
+        } else {
+            let vec: Vec<T> = next.from_payload(ctx)?;
 
             // TODO(): Replace Box::leak()
             Ok(Box::leak(vec.into_boxed_slice()))
@@ -106,6 +102,7 @@ impl<'a, C, T: FromPayload<'a, C> + 'a, const N: usize> FromPayload<'a, C> for [
                 vec.push(next.from_payload::<C, T>(ctx)?);
             }
 
+            // TODO(): Replace vec.leak()
             Ok(unsafe { *(vec.leak().as_ptr() as *const [T; N]) })
         }
     }
