@@ -35,6 +35,8 @@ use crate::Error;
 ///     - Writes data to the underlying buffer.
 /// - `fn read<'a, 'b, T>(&'b mut self, nbytes: usize) -> Result<&'a [T], Error>`:
 ///     - Reads data from the underlying buffer.
+/// - `fn read_mut<'a, 'b, T>(&'b mut self, nbytes: usize) -> Result<&'a mut [T], Error>`:
+///     - Reads data from the underlying buffer as mut.
 /// - `fn serialized(&self) -> Vec<u8>`:
 ///     - Returns a vector containing the serialized data from the underlying buffer.
 #[cfg(feature = "sync")]
@@ -86,6 +88,8 @@ impl Middleware for Next<'_> {
 ///     - Asynchronously writes data to the underlying buffer.
 /// - `async fn poll_read<'a, 'b, T: 'a>(&'b mut self, nbytes: usize) -> Result<&'a [T], Error>`:
 ///     - Asynchronously reads data from the underlying buffer.
+/// - `async fn poll_read_mut<'a, 'b, T: 'a>(&'b mut self, nbytes: usize) -> Result<&'a mut [T], Error>`:
+///     - Asynchronously reads data from the underlying buffer as mut.
 #[cfg(feature = "async")]
 impl AsyncMiddleware for Next<'_> {
     #[inline(always)]
@@ -130,6 +134,8 @@ impl AsyncMiddleware for Next<'_> {
 ///     - Writes data to the underlying `Cow` buffer, ensuring the size of `T` is 1 byte.
 /// - `fn read<'a, 'b, T>(&'b mut self, nbytes: usize) -> Result<&'a [T], Error>`:
 ///     - Reads data from the underlying `Cow` buffer, ensuring the size of `T` is 1 byte.
+/// - `fn read_mut<'a, 'b, T>(&'b mut self, nbytes: usize) -> Result<&'a [T], Error>`:
+///     - Reads data as mut from the underlying `Cow` buffer, ensuring the size of `T` is 1 byte.
 pub trait CowRw {
     fn write<T>(&mut self, data: &[T]) -> Result<(), Error>;
     fn read<'a, 'b, T>(&'b mut self, nbytes: usize) -> Result<&'a [T], Error>;
