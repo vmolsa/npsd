@@ -1,4 +1,5 @@
 use core::str;
+use std::str::FromStr;
 
 use super::{Error, AsyncMiddleware, AsyncPayload, AsyncIntoPayload, AsyncFromPayload};
 
@@ -36,13 +37,11 @@ impl<'a, C: Send + Sync> AsyncFromPayload<'a, C> for &'a str {
     async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
         where 'a: 'b
     {
-        let slice: &[u8] = next.poll_from_payload(ctx).await?;
+        let nbytes: usize = next.poll_from_payload(ctx).await?;
 
-        let result = str::from_utf8(slice).map_err(|e| {
+        str::from_utf8(next.poll_read(nbytes).await?).map_err(|e| {
             Error::InvalidUtf8(e.to_string())
-        })?;
-
-        Ok(result)
+        })
     }
 }
 
@@ -59,13 +58,11 @@ impl<'a, C: Send + Sync> AsyncFromPayload<'a, C> for &'a mut str {
     async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
         where 'a: 'b
     {
-        let slice: &mut [u8] = next.poll_from_payload(ctx).await?;
+        let nbytes: usize = next.poll_from_payload(ctx).await?;
         
-        let result = str::from_utf8_mut(slice).map_err(|e| {
+        str::from_utf8_mut(next.poll_read_mut(nbytes).await?).map_err(|e| {
             Error::InvalidUtf8(e.to_string())
-        })?;
-
-        Ok(result)
+        })
     }
 }
 
@@ -81,13 +78,9 @@ impl<'a, C: Send + Sync> AsyncFromPayload<'a, C> for String {
     async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
         where 'a: 'b
     {
-        let slice: &mut str = next.poll_from_payload(ctx).await?;
-
-        let result = unsafe {
-            String::from_raw_parts(slice.as_mut_ptr(), slice.len(), slice.len())
-        };
-
-        Ok(result)
+        String::from_str(next.poll_from_payload(ctx).await?).map_err(|e| {
+            Error::InvalidUtf8(e.to_string())
+        })
     }
 }
 

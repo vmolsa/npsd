@@ -35,6 +35,7 @@ impl<'a, C: Send + Sync, T: AsyncFromPayload<'a, C> + 'a> AsyncFromPayload<'a, C
                 vec.push(next.poll_from_payload::<C, T>(ctx).await?);
             }
 
+            // TODO(): Replace Box::leak()
             Ok(Box::leak(vec.into_boxed_slice()))
         }
     }
@@ -71,6 +72,7 @@ impl<'a, C: Send + Sync, T: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for
                 vec.push(next.poll_from_payload::<C, T>(ctx).await?);
             }
 
+            // TODO(): Replace Box::leak()
             Ok(Box::leak(vec.into_boxed_slice()))
         }
     }
@@ -112,6 +114,7 @@ impl<'a, C: Send + Sync, T: AsyncFromPayload<'a, C> + 'a, const N: usize> AsyncF
                 vec.push(next.poll_from_payload::<C, T>(ctx).await?);
             }
 
+            // TODO(): Replace vec.leak()
             Ok(unsafe { *(vec.leak().as_ptr() as *const [T; N]) })
         }
     }

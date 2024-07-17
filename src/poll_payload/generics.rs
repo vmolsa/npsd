@@ -14,6 +14,7 @@ impl<'a, C: Send + Sync, T: AsyncFromPayload<'a, C> + Borrow<T>> AsyncFromPayloa
     async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
         where 'a: 'b,
     {
+        // TODO(): Replace Box::leak()
         Ok(Box::leak(Box::new(next.poll_from_payload::<C, T>(ctx).await?)))
     }
 }
@@ -32,6 +33,7 @@ impl<'a, C: Send + Sync, T: AsyncFromPayload<'a, C> + BorrowMut<T>> AsyncFromPay
     async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
         where 'a: 'b,
     {
+        // TODO(): Replace Box::leak()
         Ok(Box::leak(Box::new(next.poll_from_payload::<C, T>(ctx).await?)))
     }
 }

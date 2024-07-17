@@ -110,6 +110,7 @@ impl_payload_smart_slice_traits!(Arc);
 //         where 'a: 'b,
 //     {
 //         let boxed_ref_cell = Box::new(RefCell::new(next.poll_from_payload::<C, T>(ctx).await?));
+//         // TODO(): Replace Box::leak()
 //         let cell: &'a RefCell<T> = Box::leak(boxed_ref_cell);
 
 //         let borrowed = cell.borrow();
