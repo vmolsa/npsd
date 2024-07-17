@@ -184,6 +184,7 @@ pub trait Middleware {
     fn from_payload<'a, 'b, C, T: FromPayload<'a, C>>(&mut self, ctx: &mut C) -> Result<T, Error> where 'a: 'b;
     fn write<T>(&mut self, data: &[T]) -> Result<(), Error>;
     fn read<'a, 'b, T>(&'b mut self, nbytes: usize) -> Result<&'a [T], Error>;
+    fn read_mut<'a, 'b, T>(&'b mut self, nbytes: usize) -> Result<&'a mut [T], Error>;
 }
 
 /// The `AsyncMiddleware` trait defines asynchronous methods for converting types to and from payloads of bytes.
@@ -202,7 +203,8 @@ pub trait AsyncMiddleware: Send + Sync {
     fn poll_into_payload<C: Send + Sync, T: AsyncIntoPayload<C>>(&mut self, value: &T, ctx: &mut C) -> impl Future<Output = Result<(), Error>>;
     fn poll_from_payload<'a, 'b, C: Send + Sync, T: AsyncFromPayload<'a, C>>(&'b mut self, ctx: &mut C) -> impl Future<Output = Result<T, Error>> where 'a: 'b;
     fn poll_write<T>(&mut self, data: &[T]) -> impl Future<Output = Result<(), Error>>;
-    fn poll_read<'a,'b, T: 'a>(&mut self, nbytes: usize) -> impl Future<Output = Result<&'a [T], Error>>;
+    fn poll_read<'a, 'b, T: 'a>(&mut self, nbytes: usize) -> impl Future<Output = Result<&'a [T], Error>>;
+    fn poll_read_mut<'a, 'b, T: 'a>(&mut self, nbytes: usize) -> impl Future<Output = Result<&'a mut [T], Error>>;
 }
 
 /// The `IntoPayload` trait is used to convert a type into a payload of bytes.

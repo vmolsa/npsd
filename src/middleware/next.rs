@@ -54,12 +54,17 @@ impl Middleware for Next<'_> {
 
     #[inline(always)]
     fn write<T>(&mut self, data: &[T]) -> Result<(), Error> {
-        self.0.write(data)
+        self.buf.write(data)
     }
 
     #[inline(always)]
     fn read<'a, 'b, T>(&'b mut self, nbytes: usize) -> Result<&'a [T], Error> {
-        self.0.read(nbytes)
+        self.buf.read(nbytes)
+    }
+
+    #[inline(always)]
+    fn read_mut<'a, 'b, T>(&'b mut self, nbytes: usize) -> Result<&'a mut [T], Error> {
+        self.buf.read_mut(nbytes)
     }
 }
 
@@ -104,12 +109,17 @@ impl AsyncMiddleware for Next<'_> {
 
     #[inline(always)]
     async fn poll_write<T>(&mut self, data: &[T]) -> Result<(), Error> {
-        self.0.write(data)
+        self.buf.write(data)
     }
 
     #[inline(always)]
     async fn poll_read<'a, 'b, T: 'a>(&mut self, nbytes: usize) -> Result<&'a [T], Error> {
-        self.0.read(nbytes)
+        self.buf.read(nbytes)
+    }
+
+    #[inline(always)]
+    async fn poll_read_mut<'a, 'b, T: 'a>(&mut self, nbytes: usize) -> Result<&'a mut [T], Error> {
+        self.buf.read_mut(nbytes)
     }
 }
 
@@ -123,9 +133,10 @@ impl AsyncMiddleware for Next<'_> {
 pub trait CowRw {
     fn write<T>(&mut self, data: &[T]) -> Result<(), Error>;
     fn read<'a, 'b, T>(&'b mut self, nbytes: usize) -> Result<&'a [T], Error>;
+    fn read_mut<'a, 'b, T>(&'b mut self, nbytes: usize) -> Result<&'a mut [T], Error>;
 }
 
-impl CowRw for Cow<'_, [u8]> {
+impl CowRw for (Cow<'_, [u8]>, usize) {
     fn write<T>(&mut self, data: &[T]) -> Result<(), Error> {
         debug_assert_eq!(::std::mem::size_of::<T>(), 1, "Size of T must be 1 byte");
     
@@ -136,37 +147,42 @@ impl CowRw for Cow<'_, [u8]> {
             )
         };
         
-        self.to_mut().extend_from_slice(slice);
+        self.0.to_mut().extend_from_slice(slice);
     
         Ok(())
     }
 
-    fn read<'a, 'b, T>(&'b mut self, nbytes: usize) -> Result<&'a [T], Error> {
+    fn read<'a, T>(&mut self, nbytes: usize) -> Result<&'a [T], Error> {
         debug_assert_eq!(::std::mem::size_of::<T>(), 1, "Size of T must be 1 byte");
 
-        if self.len() < nbytes {
-            return Err(Error::InvalidLength { expected: nbytes, found: self.len() });
+        if self.0.len() < self.1 + nbytes {
+            return Err(Error::InvalidLength { expected: nbytes, found: self.0.len() - self.1 });
         }
-    
-        let slice = match self {
-            ::std::borrow::Cow::Borrowed(slice) => {
-                let (left, right) = slice.split_at(nbytes);
-                *self = ::std::borrow::Cow::Borrowed(right);
-    
-                left
-            },
-            ::std::borrow::Cow::Owned(vec) => {
-                let right = vec.split_off(nbytes);
-                let left = ::std::mem::replace(vec, right);
-    
-                left.leak()
-            }
-        };
+
+        let slice = &self.0[self.1..self.1 + nbytes];
+        self.1 += nbytes;
 
         let len = slice.len() / ::std::mem::size_of::<T>();
     
         Ok(unsafe {
             ::std::slice::from_raw_parts(slice.as_ptr() as *const T, len)
+        })
+    }
+
+    fn read_mut<'a, T>(&mut self, nbytes: usize) -> Result<&'a mut [T], Error> {
+        debug_assert_eq!(::std::mem::size_of::<T>(), 1, "Size of T must be 1 byte");
+
+        if self.0.len() < self.1 + nbytes {
+            return Err(Error::InvalidLength { expected: nbytes, found: self.0.len() - self.1 });
+        }
+
+        let slice = &mut self.0.to_mut()[self.1..self.1 + nbytes];
+        self.1 += nbytes;
+
+        let len = slice.len() / ::std::mem::size_of::<T>();
+    
+        Ok(unsafe {
+            ::std::slice::from_raw_parts_mut(slice.as_ptr() as *mut T, len)
         })
     }
 }
@@ -179,37 +195,47 @@ impl CowRw for Cow<'_, [u8]> {
 /// - `impl<'a> Default for Next<'a>`:
 ///     - Provides a default implementation that creates a `Next` instance with an empty buffer.
 #[derive(Clone, Debug)]
-pub struct Next<'a>(Cow<'a, [u8]>);
+pub struct Next<'a>{
+    buf: (Cow<'a, [u8]>, usize)
+}
 
 impl<'a> Next<'a> {
     pub fn from_mut(cow: &'a mut Cow<'_, [u8]>) -> Self {
-        Self(Cow::Borrowed(&*cow))
+        Self {
+            buf: (Cow::Borrowed(&*cow), 0),
+        }
     }
 
     pub fn with_mtu(mtu: usize) -> Self {
-        Self(Cow::from(Vec::with_capacity(mtu)))
+        Self {
+            buf: (Cow::from(Vec::with_capacity(mtu)), 0),
+        }
     }
 
     #[inline(always)]
     pub fn serialized(&self) -> Vec<u8> {
-        self.0.to_vec()
+        self.buf.0.to_vec()
     }
 
     #[inline(always)]
     pub fn as_slice(&'a self) -> &'a [u8] { 
-        self.0.as_ref()
+        self.buf.0.as_ref()
     }
 }
 
 impl<'a> Default for Next<'a> {
     fn default() -> Self {
-        Next(Cow::from(Vec::new()))
+        Self {
+            buf: (Cow::from(Vec::new()), 0),
+        }
     }
 }
 
 impl<'a, T: Into<Cow<'a, [u8]>>> From<T> for Next<'a> {
     fn from(value: T) -> Self {
-        Next(value.into())
+        Self {
+            buf: (value.into(), 0),
+        }
     }
 }
 
@@ -218,7 +244,7 @@ impl<'a, T: Into<Cow<'a, [u8]>>> From<T> for Next<'a> {
 /// and their locations in the payload structure. Requires the `info` feature to be enabled.
 #[cfg(feature = "info")]
 #[derive(Clone, Debug)]
-pub struct NextTrace<'a>(Cow<'a, [u8]>, usize, LinkedList<&'static str>);
+pub struct NextTrace<'a>((Cow<'a, [u8]>, usize), usize, LinkedList<&'static str>);
 
 #[cfg(feature = "info")]
 const MAX_NESTED_DEPTH: usize = 255;
@@ -226,39 +252,39 @@ const MAX_NESTED_DEPTH: usize = 255;
 #[cfg(feature = "info")]
 impl<'a> NextTrace<'a> {
     pub fn from_mut(cow: &'a mut Cow<'_, [u8]>) -> Self {
-        Self(Cow::Borrowed(&*cow), MAX_NESTED_DEPTH, LinkedList::new())
+        Self((Cow::Borrowed(&*cow), 0), MAX_NESTED_DEPTH, LinkedList::new())
     }
 
     pub fn with_mtu(mtu: usize) -> Self {
-        Self(Cow::from(Vec::with_capacity(mtu)), MAX_NESTED_DEPTH, LinkedList::new())
+        Self((Cow::from(Vec::with_capacity(mtu)), 0), MAX_NESTED_DEPTH, LinkedList::new())
     }
 
     pub fn with_depth(depth: usize) -> Self {
-        Self(Cow::from(Vec::new()), depth, LinkedList::new())
+        Self((Cow::from(Vec::new()), 0), depth, LinkedList::new())
     }
 
     #[inline(always)]
     pub fn serialized(&self) -> Vec<u8> {
-        self.0.to_vec()
+        self.0.0.to_vec()
     }
 
     #[inline(always)]
     pub fn as_slice(&'a self) -> &'a [u8] { 
-        self.0.as_ref()
+        self.0.0.as_ref()
     }
 }
 
 #[cfg(feature = "info")]
 impl<'a, T: Into<Cow<'a, [u8]>>> From<T> for NextTrace<'a> {
     fn from(value: T) -> Self {
-        Self(value.into(), MAX_NESTED_DEPTH, LinkedList::new())
+        Self((value.into(), 0), MAX_NESTED_DEPTH, LinkedList::new())
     }
 }
 
 #[cfg(feature = "info")]
 impl<'a> Default for NextTrace<'a> {
     fn default() -> Self {
-        NextTrace(Cow::from(Vec::new()), MAX_NESTED_DEPTH, LinkedList::new())
+        NextTrace((Cow::from(Vec::new()), 0), MAX_NESTED_DEPTH, LinkedList::new())
     }
 }
 
@@ -334,6 +360,11 @@ impl Middleware for NextTrace<'_> {
     #[inline(always)]
     fn read<'a, 'b, T>(&'b mut self, nbytes: usize) -> Result<&'a [T], Error> {
         self.0.read(nbytes)
+    }
+
+    #[inline(always)]
+    fn read_mut<'a, 'b, T>(&'b mut self, nbytes: usize) -> Result<&'a mut [T], Error> {
+        self.0.read_mut(nbytes)
     }
 }
 
@@ -411,5 +442,10 @@ impl AsyncMiddleware for NextTrace<'_> {
     #[inline(always)]
     async fn poll_read<'a, 'b, T: 'a>(&mut self, nbytes: usize) -> Result<&'a [T], Error> {
         self.0.read(nbytes)
+    }
+
+    #[inline(always)]
+    async fn poll_read_mut<'a, 'b, T: 'a>(&mut self, nbytes: usize) -> Result<&'a mut [T], Error> {
+        self.0.read_mut(nbytes)
     }
 }
