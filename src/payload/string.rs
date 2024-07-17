@@ -1,4 +1,5 @@
 use core::str;
+use std::str::FromStr;
 
 use super::{Error, Middleware, Payload, IntoPayload, FromPayload};
 
@@ -36,13 +37,11 @@ impl<'a, C> FromPayload<'a, C> for &'a str {
     fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
         where 'a: 'b
     {
-        let slice: &[u8] = next.from_payload(ctx)?;
+        let nbytes: usize = next.from_payload(ctx)?;
 
-        let result = str::from_utf8(slice).map_err(|e| {
+        str::from_utf8(next.read(nbytes)?).map_err(|e| {
             Error::InvalidUtf8(e.to_string())
-        })?;
-
-        Ok(result)
+        })
     }
 }
 
@@ -59,13 +58,11 @@ impl<'a, C> FromPayload<'a, C> for &'a mut str {
     fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
         where 'a: 'b
     {
-        let slice: &mut [u8] = next.from_payload(ctx)?;
+        let nbytes: usize = next.from_payload(ctx)?;
         
-        let result = str::from_utf8_mut(slice).map_err(|e| {
+        str::from_utf8_mut(next.read_mut(nbytes)?).map_err(|e| {
             Error::InvalidUtf8(e.to_string())
-        })?;
-
-        Ok(result)
+        })
     }
 }
 
@@ -81,13 +78,9 @@ impl<'a, C> FromPayload<'a, C> for String {
     fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
         where 'a: 'b
     {
-        let slice: &mut str = next.from_payload(ctx)?;
-
-        let result = unsafe {
-            String::from_raw_parts(slice.as_mut_ptr(), slice.len(), slice.len())
-        };
-
-        Ok(result)
+        String::from_str(next.from_payload(ctx)?).map_err(|e| {
+            Error::InvalidUtf8(e.to_string())
+        })
     }
 }
 
