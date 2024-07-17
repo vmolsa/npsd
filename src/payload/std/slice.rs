@@ -1,5 +1,4 @@
-use core::{mem, slice};
-use std::borrow::Cow;
+use core::mem;
 
 use super::{Error, Middleware, Payload, IntoPayload, FromPayload};
 
@@ -27,7 +26,7 @@ impl<'a, C, T: FromPayload<'a, C>> FromPayload<'a, C> for &'a [T] {
         let len: usize = next.from_payload(ctx)?;
 
         if mem::size_of::<T>() == 1 {
-            Ok(next.read(len)?)
+            next.read(len)
         } else {
             let mut vec = Vec::with_capacity(len);
 
@@ -35,6 +34,7 @@ impl<'a, C, T: FromPayload<'a, C>> FromPayload<'a, C> for &'a [T] {
                 vec.push(next.from_payload::<C, T>(ctx)?);
             }
 
+            // TODO(): Replace Box::leak()
             Ok(Box::leak(vec.into_boxed_slice()))
         }
     }
@@ -53,24 +53,18 @@ impl<'a, C, T: FromPayload<'a, C>> FromPayload<'a, C> for &'a mut [T] where T: C
     fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
         where 'a: 'b,
     {
+        let len: usize = next.from_payload(ctx)?;
+
         if mem::size_of::<T>() == 1 {
-            let mut slice: Cow<'a, [T]> = next.from_payload(ctx)?;
-
-            let result = unsafe {
-                slice::from_raw_parts_mut(slice.to_mut().as_mut_ptr() as *mut T, slice.len())
-            };
-
-            mem::forget(slice);
-
-            Ok(result)
+            next.read_mut(len)
         } else {
-            let len: usize = next.from_payload(ctx)?;
             let mut vec = Vec::with_capacity(len);
 
             for _ in 0..len {
                 vec.push(next.from_payload::<C, T>(ctx)?);
             }
 
+            // TODO(): Replace Box::leak()
             Ok(Box::leak(vec.into_boxed_slice()))
         }
     }

@@ -15,6 +15,7 @@ impl<'a, C, T: FromPayload<'a, C> + Borrow<T>> FromPayload<'a, C> for &'a T {
     fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
         where 'a: 'b,
     {
+        // TODO(): Replace Box::leak()
         Ok(Box::leak(Box::new(next.from_payload::<C, T>(ctx)?)))
     }
 }
@@ -33,6 +34,7 @@ impl<'a, C, T: FromPayload<'a, C> + BorrowMut<T>> FromPayload<'a, C> for &'a mut
     fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
         where 'a: 'b,
     {
+        // TODO(): Replace Box::leak()
         Ok(Box::leak(Box::new(next.from_payload::<C, T>(ctx)?)))
     }
 }
