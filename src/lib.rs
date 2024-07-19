@@ -160,31 +160,43 @@
 //!    assert_eq!(deserialized, flags);
 //! }
 //! ```
-//!
-//! ## Middleware Trait
-//!
-//! The `Middleware` trait defines methods for converting types to and from payloads of bytes.
-//!
-//! ### Methods
-//!
-//! - `fn into_payload<C, T: IntoPayload<C>>(&mut self, value: &T, ctx: &mut C) -> Result<(), Error>`:
-//!     - Converts a value into a payload of bytes. This method takes a value and a context, serializes the value into a byte stream, and writes the resulting bytes into the handler.
-//! - `fn from_payload<'a, 'b, C, T: FromPayload<'a, C>>(&mut self, ctx: &mut C) -> Result<T, Error>`:
-//!     - Converts a payload of bytes back into a value. This method reads bytes from the handler, uses the context to interpret them, and reconstructs the original value.
-//! - `fn write<T>(&mut self, data: &[T]) -> Result<(), Error>`:
-//!     - Writes raw data into the handler. This method takes a slice of data and appends it to the handler after ensuring that the size of the data elements is 1 byte.
-//! - `fn read<'a, 'b, T>(&'b mut self, nbytes: usize) -> Result<&'a [T], Error>`:
-//!     - Reads raw data from the handler. This method reads a specified number of bytes from the handler, splits the handler's data accordingly, and returns a slice of the read data.
-//! - `fn serialized(&self) -> Vec<u8>`:
-//!     - Returns the serialized data as a `Vec<u8>`.
 
+
+/// The `Middleware` trait defines methods for converting types to and from payloads of bytes.
+///
+/// ### Methods
+///
+/// - `fn into_payload<C, T: IntoPayload<C>>(&mut self, value: &T, ctx: &mut C) -> Result<(), Error>`:
+///     - Converts a value into a payload of bytes. This method takes a value and a context, serializes the value into a byte stream, and writes the resulting bytes into the handler.
+/// - `fn from_payload<'a, C, T: FromPayload<'a, C>>(&mut self, ctx: &mut C) -> Result<T, Error>`:
+///     - Converts a payload of bytes back into a value. This method reads bytes from the handler, uses the context to interpret them, and reconstructs the original value.
+/// - `fn write<T>(&mut self, data: &[T]) -> Result<(), Error>`:
+///     - Writes raw data into the handler. This method takes a slice of data and appends it to the handler after ensuring that the size of the data elements is 1 byte.
+/// - `fn read<'a, T>(&'a mut self, nbytes: usize) -> Result<&'a [T], Error>`:
+///     - Reads raw data from the handler. This method reads a specified number of bytes from the handler, splits the handler's data accordingly, and returns a slice of the read data.
+/// - `fn read_mut<'a, T>(&'a mut self, nbytes: usize) -> Result<&'a mut [T], Error>`:
+///     - Reads raw data from the handler. This method reads a specified number of bytes from the handler, splits the handler's data accordingly, and returns a mutable slice of the read data.
+/// - `fn push<T: AnyBox<'a>>(&mut self, value: Box<T>) -> Result<&'a T, Error>`:
+///     - Pushes a boxed value into the handler, returning a reference to the stored value.
+/// - `fn push_mut<T: AnyBox<'a>>(&mut self, value: Box<T>) -> Result<&'a mut T, Error>`:
+///     - Pushes a boxed value into the handler, returning a mutable reference to the stored value.
+/// - `fn push_array<T: AnyBox<'a>>(&mut self, values: Box<[T]>) -> Result<&'a [T], Error>`:
+///     - Pushes a boxed array of values into the handler, returning a reference to the stored array.
+/// - `fn push_array_mut<T: AnyBox<'a>>(&mut self, values: Box<[T]>) -> Result<&'a mut [T], Error>`:
+///     - Pushes a boxed array of values into the handler, returning a mutable reference to the stored array.
 #[cfg(feature = "sync")]
-pub trait Middleware {
+pub trait Middleware<'a> {
     fn into_payload<C, T: IntoPayload<C>>(&mut self, value: &T, ctx: &mut C) -> Result<(), Error>;
-    fn from_payload<'a, 'b, C, T: FromPayload<'a, C>>(&mut self, ctx: &mut C) -> Result<T, Error> where 'a: 'b;
+    fn from_payload<C, T: FromPayload<'a, C>>(&mut self, ctx: &mut C) -> Result<T, Error>;
+
     fn write<T>(&mut self, data: &[T]) -> Result<(), Error>;
-    fn read<'a, 'b, T>(&'b mut self, nbytes: usize) -> Result<&'a [T], Error>;
-    fn read_mut<'a, 'b, T>(&'b mut self, nbytes: usize) -> Result<&'a mut [T], Error>;
+    fn read<T>(&mut self, nbytes: usize) -> Result<&'a [T], Error>;
+    fn read_mut<T>(&mut self, nbytes: usize) -> Result<&'a mut [T], Error>;
+
+    fn push<T: AnyBox<'a>>(&mut self, value: Box<T>) -> Result<&'a T, Error>;
+    fn push_mut<T: AnyBox<'a>>(&mut self, value: Box<T>) -> Result<&'a mut T, Error>;
+    fn push_array<T: AnyBox<'a>>(&mut self, values: Box<[T]>) -> Result<&'a [T], Error>;
+    fn push_array_mut<T: AnyBox<'a>>(&mut self, values: Box<[T]>) -> Result<&'a mut [T], Error>;
 }
 
 /// The `AsyncMiddleware` trait defines asynchronous methods for converting types to and from payloads of bytes.
@@ -196,108 +208,116 @@ pub trait Middleware {
 ///     - Polls the conversion of a payload of bytes back into a value asynchronously.
 /// - `fn poll_write<T>(&mut self, data: &[T]) -> impl Future<Output = Result<(), Error>>`:
 ///     - Polls the asynchronous writing of raw data into the handler.
-/// - `fn poll_read<'a, 'b, T: 'a>(&'b mut self, nbytes: usize) -> impl Future<Output = Result<&'a [T], Error>>`:
+/// - `fn poll_read<'a, T>(&'a mut self, nbytes: usize) -> impl Future<Output = Result<&'a [T], Error>>`:
 ///     - Polls the asynchronous reading of raw data from the handler.
+/// - `fn poll_read_mut<'a, T>(&'a mut self, nbytes: usize) -> impl Future<Output = Result<&'a mut [T], Error>>`:
+///     - Polls the asynchronous reading of raw data from the handler, returning a mutable slice of the read data.
+/// - `fn poll_push<T: AnyBox<'a>>(&mut self, value: Box<T>) -> impl Future<Output = Result<&'a T, Error>>`:
+///     - Polls the asynchronous pushing of a boxed value into the handler, returning a reference to the stored value.
+/// - `fn poll_push_mut<T: AnyBox<'a>>(&mut self, value: Box<T>) -> impl Future<Output = Result<&'a mut T, Error>>`:
+///     - Polls the asynchronous pushing of a boxed value into the handler, returning a mutable reference to the stored value.
+/// - `fn poll_push_array<T: AnyBox<'a>>(&mut self, values: Box<[T]>) -> impl Future<Output = Result<&'a [T], Error>>`:
+///     - Polls the asynchronous pushing of a boxed array of values into the handler, returning a reference to the stored array.
+/// - `fn poll_push_array_mut<T: AnyBox<'a>>(&mut self, values: Box<[T]>) -> impl Future<Output = Result<&'a mut [T], Error>>`:
+///     - Polls the asynchronous pushing of a boxed array of values into the handler, returning a mutable reference to the stored array.
 #[cfg(feature = "async")]
-pub trait AsyncMiddleware: Send + Sync {
+pub trait AsyncMiddleware<'a>: Send + Sync {
     fn poll_into_payload<C: Send + Sync, T: AsyncIntoPayload<C>>(&mut self, value: &T, ctx: &mut C) -> impl Future<Output = Result<(), Error>>;
-    fn poll_from_payload<'a, 'b, C: Send + Sync, T: AsyncFromPayload<'a, C>>(&'b mut self, ctx: &mut C) -> impl Future<Output = Result<T, Error>> where 'a: 'b;
+    fn poll_from_payload<C: Send + Sync, T: AsyncFromPayload<'a, C>>(&mut self, ctx: &mut C) -> impl Future<Output = Result<T, Error>>;
+
     fn poll_write<T>(&mut self, data: &[T]) -> impl Future<Output = Result<(), Error>>;
-    fn poll_read<'a, 'b, T: 'a>(&mut self, nbytes: usize) -> impl Future<Output = Result<&'a [T], Error>>;
-    fn poll_read_mut<'a, 'b, T: 'a>(&mut self, nbytes: usize) -> impl Future<Output = Result<&'a mut [T], Error>>;
+    fn poll_read<T: 'a>(&mut self, nbytes: usize) -> impl Future<Output = Result<&'a [T], Error>>;
+    fn poll_read_mut<T: 'a>(&mut self, nbytes: usize) -> impl Future<Output = Result<&'a mut [T], Error>>;
+
+    fn poll_push<T: AnyBox<'a>>(&mut self, value: Box<T>) -> impl Future<Output = Result<&'a T, Error>>;
+    fn poll_push_mut<T: AnyBox<'a>>(&mut self, value: Box<T>) -> impl Future<Output = Result<&'a mut T, Error>>;
+    fn poll_push_array<T: AnyBox<'a>>(&mut self, values: Box<[T]>) -> impl Future<Output = Result<&'a [T], Error>>;
+    fn poll_push_array_mut<T: AnyBox<'a>>(&mut self, values: Box<[T]>) -> impl Future<Output = Result<&'a mut [T], Error>>;
 }
 
 /// The `IntoPayload` trait is used to convert a type into a payload of bytes.
 ///
 /// ### Methods
-/// - `fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>`:
+/// - `fn into_payload<'m, M: Middleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>`:
 ///     - Converts a value into a payload of bytes. This method takes the value, context, and middleware, serializes the value into a byte stream, and writes it into the handler.
 #[cfg(not(feature = "info"))]
 #[cfg(feature = "sync")]
 pub trait IntoPayload<C> {
-    fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>;
+    fn into_payload<'m, M: Middleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>;
 }
 
 #[cfg(feature = "info")]
 #[cfg(feature = "sync")]
 pub trait IntoPayload<C>: PayloadInfo {
-    fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>;
+    fn into_payload<'m, M: Middleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>;
 }
 
 /// The `AsyncIntoPayload` trait is used for asynchronous methods for converting types into payloads of bytes.
 ///
 /// ### Methods
-/// - `fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> impl Future<Output = Result<(), Error>>`:
+/// - `fn poll_into_payload<'m, M: AsyncMiddleware<'m>>(&self, ctx: &mut C, next: &mut M) -> impl Future<Output = Result<(), Error>>`:
 ///     - Polls the conversion of a value into a payload of bytes asynchronously.
 #[cfg(not(feature = "info"))]
 #[cfg(feature = "async")]
 pub trait AsyncIntoPayload<C: Send + Sync>: Send + Sync {
-    fn poll_into_payload<M: AsyncMiddleware>(&self, ctx: &mut C, next: &mut M) -> impl Future<Output = Result<(), Error>>;
+    fn poll_into_payload<'m, M: AsyncMiddleware<'m>>(&self, ctx: &mut C, next: &mut M) -> impl Future<Output = Result<(), Error>>;
 }
 
 #[cfg(feature = "info")]
 #[cfg(feature = "async")]
 pub trait AsyncIntoPayload<C: Send + Sync>: PayloadInfo + Send + Sync {
-    fn poll_into_payload<M: AsyncMiddleware>(&self, ctx: &mut C, next: &mut M) -> impl Future<Output = Result<(), Error>>;
+    fn poll_into_payload<'m, M: AsyncMiddleware<'m>>(&self, ctx: &mut C, next: &mut M) -> impl Future<Output = Result<(), Error>>;
 }
 
 /// The `FromPayload` trait is used to convert a payload of bytes back into a type.
 /// 
 /// ### Methods
-/// - `fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>`:
+/// - `fn from_payload<M: Middleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error>`:
 ///     - Converts a payload of bytes back into a value. This method reads bytes from the handler, uses the context and middleware to interpret them, and reconstructs the original value.
 #[cfg(not(feature = "info"))]
 #[cfg(feature = "sync")]
 pub trait FromPayload<'a, C>: Sized {
-    fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where 'a: 'b;
+    fn from_payload<M: Middleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error>;
 }
 
 #[cfg(feature = "info")]
 #[cfg(feature = "sync")]
 pub trait FromPayload<'a, C>: PayloadInfo + Sized {
-    fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where 'a: 'b;
+    fn from_payload<M: Middleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error>;
 }
 
 /// The `AsyncFromPayload` trait is used for asynchronous methods for converting payloads of bytes back into types.
 ///
 /// ### Methods
-/// - `fn poll_from_payload<'b, M: AsyncMiddleware<'a>>(ctx: &mut C, next: &'a mut M) -> impl Future<Output = Result<Self, Error>>`:
+/// - `fn poll_from_payload<'m, M: AsyncMiddleware<'a>>(ctx: &mut C, next: &mut M) -> impl Future<Output = Result<Self, Error>>`:
 ///     - Polls the conversion of a payload of bytes back into a value asynchronously.
 #[cfg(not(feature = "info"))]
 #[cfg(feature = "async")]
 pub trait AsyncFromPayload<'a, C: Send + Sync>: Sized + Send + Sync {
-    fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> impl Future<Output = Result<Self, Error>>
-        where 'a: 'b;
+    fn poll_from_payload<M: AsyncMiddleware<'a>>(ctx: &mut C, next: &mut M) -> impl Future<Output = Result<Self, Error>>;
 }
 
 #[cfg(feature = "info")]
 #[cfg(feature = "async")]
 pub trait AsyncFromPayload<'a, C: Send + Sync>: PayloadInfo + Sized + Send + Sync {
-    fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> impl Future<Output = Result<Self, Error>>
-        where 'a: 'b;
+    fn poll_from_payload<M: AsyncMiddleware<'a>>(ctx: &mut C, next: &mut M) -> impl Future<Output = Result<Self, Error>>;
 }
 
 /// The `Payload` trait combines `IntoPayload` and `FromPayload` to facilitate complete serialization and deserialization of types.
 ///
 /// ### Methods
-/// - `fn from_packet<'b, 'c, M: Middleware>(ctx: &mut C, next: &'c mut M) -> Result<Self, Error>`:
-///     - Deserializes a buffer into a value. This method takes a context and a buffer containing the serialized data, and returns the deserialized value.
-/// - `fn into_packet<'b, 'c, M: Middleware>(&'b self, ctx: &mut C, next: &mut M) -> Result<(), Error>`:
+/// - `fn into_packet<'b, M: Middleware<'b>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>`:
 ///     - Serializes a value into a buffer. This method takes the value, context, and an initial buffer capacity, serializes the value, and returns the resulting byte buffer.
+/// - `fn from_packet<'m, M: Middleware<'m>>(ctx: &mut C, next: &mut M) -> Result<Self, Error>`:
+///     - Deserializes a buffer into a value. This method takes a context and a buffer containing the serialized data, and returns the deserialized value.
 #[cfg(feature = "sync")]
-pub trait Payload<C> {
-    fn into_packet<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>
-        where Self: IntoPayload<C> + Sized
-    {
+pub trait Payload<'a, C>: IntoPayload<C> + FromPayload<'a, C> + Sized {
+    fn into_packet<'b, M: Middleware<'b>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
         next.into_payload(self, ctx)
     }
 
     #[inline(always)]
-    fn from_packet<'b, M: Middleware>(ctx: &'b mut C, next: &'b mut M) -> Result<Self, Error>
-        where Self: FromPayload<'b, C> + Sized
-    {
+    fn from_packet<M: Middleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         next.from_payload(ctx)
     }
 }
@@ -305,24 +325,24 @@ pub trait Payload<C> {
 /// The `AsyncPayload` trait combines `AsyncIntoPayload` and `AsyncFromPayload` to asynchronous methods for complete serialization and deserialization of types.
 ///
 /// ### Methods
-/// - `fn poll_into_packet<'b, M: AsyncMiddleware>(&'b self, ctx: &'b mut C, next: &'b mut M) -> impl Future<Output = Result<(), Error>>`:
+/// - `fn poll_into_packet<'m, M: AsyncMiddleware<'m>>(&self, ctx: &mut C, next: &mut M) -> impl Future<Output = Result<(), Error>>`:
 ///     - Initiates the asynchronous conversion of a value into a packet.
-/// - `fn poll_from_packet<'b, M: AsyncMiddleware>(ctx: &'b mut C, next: &'b mut M) -> impl Future<Output = Result<Self, Error>>`:
+/// - `fn poll_from_packet<'m, M: AsyncMiddleware<'m>>(ctx: &mut C, next: &mut M) -> impl Future<Output = Result<Self, Error>>`:
 ///     - Initiates the asynchronous deserialization of a packet into a value.
 #[cfg(feature = "async")]
-pub trait AsyncPayload<C: Send + Sync>: Send + Sync {
-    fn poll_into_packet<'b, M: AsyncMiddleware>(&'b self, ctx: &'b mut C, next: &'b mut M) -> impl Future<Output = Result<(), Error>>
-        where Self: AsyncIntoPayload<C> + Sized
-    {
+pub trait AsyncPayload<'a, C: Send + Sync>: AsyncIntoPayload<C> + AsyncFromPayload<'a, C> + 'a + Send + Sync + Sized {
+    fn poll_into_packet<'b, M: AsyncMiddleware<'b>>(&self, ctx: &mut C, next: &mut M) -> impl Future<Output = Result<(), Error>> {
         next.poll_into_payload(self, ctx)
     }
 
-    fn poll_from_packet<'b, M: AsyncMiddleware>(ctx: &'b mut C, next: &'b mut M) -> impl Future<Output = Result<Self, Error>>
-        where Self: AsyncFromPayload<'b, C> + Sized
-    {
-       next.poll_from_payload(ctx)
+    #[inline(always)]
+    fn poll_from_packet<M: AsyncMiddleware<'a>>(ctx: &mut C, next: &mut M) -> impl Future<Output = Result<Self, Error>> {
+        next.poll_from_payload(ctx)
     }
 }
+
+pub trait AnyBox<'a>: Send + Sync + 'a {}
+impl<'a, T: Send + Sync + 'a> AnyBox<'a> for T {}
 
 /// The `PayloadInfo` trait provides metadata about the payload.
 ///
@@ -340,6 +360,12 @@ pub mod middleware;
 pub mod error;
 pub mod info;
 pub mod features;
+
+#[cfg(feature = "crossbeam")]
+pub mod stack;
+
+#[cfg(feature = "crossbeam")]
+pub use stack::*;
 
 #[cfg(feature = "sync")]
 pub mod payload;

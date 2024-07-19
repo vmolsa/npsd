@@ -26,8 +26,8 @@ use super::{Error, Middleware, Payload, IntoPayload, FromPayload};
 /// }
 /// ```
 
-impl<C> IntoPayload<C> for io::Error {
-    fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
+impl<C> IntoPayload<C>  for io::Error {
+    fn into_payload<'m, M: Middleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
         let kind: u8 = match self.kind() {
             ErrorKind::NotFound => 0,
             ErrorKind::PermissionDenied => 1,
@@ -100,9 +100,7 @@ impl<C> IntoPayload<C> for io::Error {
 }
 
 impl<'a, C> FromPayload<'a, C> for io::Error {
-    fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where 'a: 'b,
-    {
+    fn from_payload<M: Middleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         let byte: u8 = next.from_payload(ctx)?;
         let msg: String = next.from_payload(ctx)?;
 
@@ -176,4 +174,4 @@ impl<'a, C> FromPayload<'a, C> for io::Error {
     }
 }
 
-impl<C> Payload<C> for io::Error {}
+impl<'a, C> Payload<'a, C> for io::Error {}

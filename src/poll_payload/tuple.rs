@@ -7,7 +7,7 @@ macro_rules! async_payload_tuple {
             where
                 $($T: AsyncIntoPayload<X> + Send + Sync,)+
         {
-            async fn poll_into_payload<Y: AsyncMiddleware>(&self, ctx: &mut X, next: &mut Y) -> Result<(), Error> {
+            async fn poll_into_payload<'m, Y: AsyncMiddleware<'m>>(&self, ctx: &mut X, next: &mut Y) -> Result<(), Error> {
                 $(
                     next.poll_into_payload(&self.$i, ctx).await?;
                 )+
@@ -20,18 +20,16 @@ macro_rules! async_payload_tuple {
             where
                 $($T: AsyncFromPayload<'a, X>,)+
         {
-            async fn poll_from_payload<'b, Y: AsyncMiddleware>(ctx: &mut X, next: &'b mut Y) -> Result<Self, Error>
-                where 'a: 'b,
-            {
+            async fn poll_from_payload<Y: AsyncMiddleware<'a>>(ctx: &mut X, next: &mut Y) -> Result<Self, Error> {
                 Ok(($(
                     next.poll_from_payload::<X, $T>(ctx).await?,
                 )+))
             }
         }
 
-        impl<X: Send + Sync, $($T),+> AsyncPayload<X> for ($($T,)+) 
+        impl<'a, X: Send + Sync, $($T),+> AsyncPayload<'a, X> for ($($T,)+) 
             where
-                $($T: AsyncPayload<X>,)+ {}
+                $($T: AsyncPayload<'a, X>,)+ {}
     };
 }
 

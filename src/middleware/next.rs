@@ -9,7 +9,10 @@ use crate::{FromPayload, IntoPayload, Middleware};
 #[cfg(feature = "async")]
 use crate::{AsyncFromPayload, AsyncIntoPayload, AsyncMiddleware};
 
-use crate::Error;
+#[cfg(feature = "crossbeam")]
+use crate::Stack;
+
+use crate::{AnyBox, Error};
 
 /// A no-op implementation of the `Middleware` and `AsyncMiddleware` traits.
 ///
@@ -25,7 +28,7 @@ use crate::Error;
 ///   ) -> Result<(), Error>`:
 ///     - Converts a value into a payload of bytes. This method forwards the serialization task to
 ///       the `into_payload` method of the value being processed.
-/// - `fn from_payload<'a, 'b, C, T: FromPayload<'a, C>>(
+/// - `fn from_payload<'a, C, T: FromPayload<'a, C>>(
 ///       &mut self,
 ///       ctx: &mut C
 ///   ) -> Result<T, Error>`:
@@ -33,24 +36,27 @@ use crate::Error;
 ///       to the `from_payload` method of the type being processed.
 /// - `fn write<T>(&mut self, data: &[T]) -> Result<(), Error>`:
 ///     - Writes data to the underlying buffer.
-/// - `fn read<'a, 'b, T>(&'b mut self, nbytes: usize) -> Result<&'a [T], Error>`:
+/// - `fn read<'a, T>(&mut self, nbytes: usize) -> Result<&'a [T], Error>`:
 ///     - Reads data from the underlying buffer.
-/// - `fn read_mut<'a, 'b, T>(&'b mut self, nbytes: usize) -> Result<&'a mut [T], Error>`:
+/// - `fn read_mut<'a, T>(&mut self, nbytes: usize) -> Result<&'a mut [T], Error>`:
 ///     - Reads data from the underlying buffer as mut.
-/// - `fn serialized(&self) -> Vec<u8>`:
-///     - Returns a vector containing the serialized data from the underlying buffer.
+/// - `fn push<T: AnyBox<'a>>(&mut self, value: Box<T>) -> Result<&'a T, Error>`:
+///     - Pushes a value onto the stack.
+/// - `fn push_mut<T: AnyBox<'a>>(&mut self, value: Box<T>) -> Result<&'a mut T, Error>`:
+///     - Pushes a mutable value onto the stack.
+/// - `fn push_array<T: AnyBox<'a>>(&mut self, values: Box<[T]>) -> Result<&'a [T], Error>`:
+///     - Pushes an array of values onto the stack.
+/// - `fn push_array_mut<T: AnyBox<'a>>(&mut self, values: Box<[T]>) -> Result<&'a mut [T], Error>`:
+///     - Pushes a mutable array of values onto the stack.
 #[cfg(feature = "sync")]
-impl Middleware for Next<'_> {
+impl<'a> Middleware<'a> for Next<'a> {
     #[inline(always)]
     fn into_payload<C, T: IntoPayload<C>>(&mut self, value: &T, ctx: &mut C) -> Result<(), Error> {   
         value.into_payload(ctx, self)
     }
 
     #[inline(always)]
-    fn from_payload<'a, 'b, C, T: FromPayload<'a, C>>(&mut self, ctx: &mut C) -> Result<T, Error>
-        where
-            'a: 'b 
-    {
+    fn from_payload<C, T: FromPayload<'a, C>>(&mut self, ctx: &mut C) -> Result<T, Error> {
         T::from_payload(ctx, self)
     }
 
@@ -60,38 +66,94 @@ impl Middleware for Next<'_> {
     }
 
     #[inline(always)]
-    fn read<'a, 'b, T>(&'b mut self, nbytes: usize) -> Result<&'a [T], Error> {
+    fn read<T>(&mut self, nbytes: usize) -> Result<&'a [T], Error> {
         self.buf.read(nbytes)
     }
 
     #[inline(always)]
-    fn read_mut<'a, 'b, T>(&'b mut self, nbytes: usize) -> Result<&'a mut [T], Error> {
+    fn read_mut<T>(&mut self, nbytes: usize) -> Result<&'a mut [T], Error> {
         self.buf.read_mut(nbytes)
+    }
+
+    #[cfg(feature = "crossbeam")]
+    #[inline(always)]
+    fn push<T: AnyBox<'a>>(&mut self, value: Box<T>) -> Result<&'a T, Error> {
+        Ok(self.stack.push(value))
+    }
+
+    #[cfg(feature = "crossbeam")]
+    #[inline(always)]
+    fn push_mut<T: AnyBox<'a>>(&mut self, value: Box<T>) -> Result<&'a mut T, Error> {
+        Ok(self.stack.push_mut(value))
+    }
+
+    #[cfg(feature = "crossbeam")]
+    #[inline(always)]
+    fn push_array<T: AnyBox<'a>>(&mut self, values: Box<[T]>) -> Result<&'a [T], Error> {
+        Ok(self.stack.push_array(values))
+    }
+
+    #[cfg(feature = "crossbeam")]
+    #[inline(always)]
+    fn push_array_mut<T: AnyBox<'a>>(&mut self, values: Box<[T]>) -> Result<&'a mut [T], Error> {
+        Ok(self.stack.push_array_mut(values))
+    }
+
+    #[cfg(not(feature = "crossbeam"))]
+    #[inline(always)]
+    fn push<T: AnyBox<'a>>(&mut self, _value: Box<T>) -> Result<&'a T, Error> {
+        Err(Error::Stack("References disabled".to_string()))
+    }
+
+    #[cfg(not(feature = "crossbeam"))]
+    #[inline(always)]
+    fn push_mut<T: AnyBox<'a>>(&mut self, _value: Box<T>) -> Result<&'a mut T, Error> {
+        Err(Error::Stack("References disabled".to_string()))
+    }
+
+    #[cfg(not(feature = "crossbeam"))]
+    #[inline(always)]
+    fn push_array<T: AnyBox<'a>>(&mut self, _values: Box<[T]>) -> Result<&'a [T], Error> {
+        Err(Error::Stack("References disabled".to_string()))
+    }
+
+    #[cfg(not(feature = "crossbeam"))]
+    #[inline(always)]
+    fn push_array_mut<T: AnyBox<'a>>(&mut self, _values: Box<[T]>) -> Result<&'a mut [T], Error> {
+        Err(Error::Stack("References disabled".to_string()))
     }
 }
 
 /// # AsyncMiddleware Methods
-/// - `async fn poll_into_payload<C, T: AsyncIntoPayload<C>>(
+/// - `fn poll_into_payload<C, T: AsyncIntoPayload<C>>(
 ///       &mut self,
 ///       value: &T,
 ///       ctx: &mut C
-///   ) -> Result<(), Error>`:
+///   ) -> impl Future<Output = Result<(), Error>>`:
 ///     - Asynchronously converts a value into a payload of bytes. This method forwards the serialization
 ///       task to the `poll_into_payload` method of the value being processed.
-/// - `async fn poll_from_payload<'a, C, T: AsyncFromPayload<'a, C>>(
+/// - `fn poll_from_payload<'a, C, T: AsyncFromPayload<'a, C>>(
 ///       &mut self,
 ///       ctx: &mut C
-///   ) -> Result<T, Error>`:
+///   ) -> impl Future<Output = Result<T, Error>>`:
 ///     - Asynchronously converts a payload of bytes back into a value. This method forwards the deserialization
 ///       task to the `poll_from_payload` method of the type being processed.
 /// - `async fn poll_write<T>(&mut self, data: &[T]) -> Result<(), Error>`:
 ///     - Asynchronously writes data to the underlying buffer.
-/// - `async fn poll_read<'a, 'b, T: 'a>(&'b mut self, nbytes: usize) -> Result<&'a [T], Error>`:
+/// - `async fn poll_read<T: 'a>(&mut self, nbytes: usize) -> Result<&'a [T], Error>`:
 ///     - Asynchronously reads data from the underlying buffer.
-/// - `async fn poll_read_mut<'a, 'b, T: 'a>(&'b mut self, nbytes: usize) -> Result<&'a mut [T], Error>`:
+/// - `async fn poll_read_mut<T: 'a>(&mut self, nbytes: usize) -> Result<&'a mut [T], Error>`:
 ///     - Asynchronously reads data from the underlying buffer as mut.
+/// - `async fn poll_push<T: AnyBox<'a>>(&mut self, value: Box<T>) -> Result<&'a T, Error>`:
+///     - Asynchronously pushes a value onto the stack.
+/// - `async fn poll_push_mut<T: AnyBox<'a>>(&mut self, value: Box<T>) -> Result<&'a mut T, Error>`:
+///     - Asynchronously pushes a mutable value onto the stack.
+/// - `async fn poll_push_array<T: AnyBox<'a>>(&mut self, values: Box<[T]>) -> Result<&'a [T], Error>`:
+///     - Asynchronously pushes an array of values onto the stack.
+/// - `async fn poll_push_array_mut<T: AnyBox<'a>>(&mut self, values: Box<[T]>) -> Result<&'a mut [T], Error>`:
+///     - Asynchronously pushes a mutable array of values onto the stack.
 #[cfg(feature = "async")]
-impl AsyncMiddleware for Next<'_> {
+impl<'a> AsyncMiddleware<'a> for Next<'a> {
     #[inline(always)]
     fn poll_into_payload<C: Send + Sync, T: AsyncIntoPayload<C>>(
         &mut self,
@@ -102,12 +164,10 @@ impl AsyncMiddleware for Next<'_> {
     }
     
     #[inline(always)]
-    fn poll_from_payload<'a, 'b, C: Send + Sync, T: AsyncFromPayload<'a, C>> (
-        &'b mut self,
+    fn poll_from_payload<C: Send + Sync, T: AsyncFromPayload<'a, C>> (
+        &mut self,
         ctx: &mut C,
-    ) -> impl core::future::Future<Output = Result<T, Error>>
-        where 'a: 'b
-    {
+    ) -> impl core::future::Future<Output = Result<T, Error>> {
         T::poll_from_payload(ctx, self)
     }
 
@@ -117,13 +177,61 @@ impl AsyncMiddleware for Next<'_> {
     }
 
     #[inline(always)]
-    async fn poll_read<'a, 'b, T: 'a>(&mut self, nbytes: usize) -> Result<&'a [T], Error> {
+    async fn poll_read<T: 'a>(&mut self, nbytes: usize) -> Result<&'a [T], Error> {
         self.buf.read(nbytes)
     }
 
     #[inline(always)]
-    async fn poll_read_mut<'a, 'b, T: 'a>(&mut self, nbytes: usize) -> Result<&'a mut [T], Error> {
+    async fn poll_read_mut<T: 'a>(&mut self, nbytes: usize) -> Result<&'a mut [T], Error> {
         self.buf.read_mut(nbytes)
+    }
+
+    #[cfg(feature = "crossbeam")]
+    #[inline(always)]
+    async fn poll_push<T: AnyBox<'a>>(&mut self, value: Box<T>) -> Result<&'a T, Error> {
+        Ok(self.stack.push(value))
+    }
+
+    #[cfg(feature = "crossbeam")]
+    #[inline(always)]
+    async fn poll_push_mut<T: AnyBox<'a>>(&mut self, value: Box<T>) -> Result<&'a mut T, Error> {
+        Ok(self.stack.push_mut(value))
+    }
+
+    #[cfg(feature = "crossbeam")]
+    #[inline(always)]
+    async fn poll_push_array<T: AnyBox<'a>>(&mut self, values: Box<[T]>) -> Result<&'a [T], Error> {
+        Ok(self.stack.push_array(values))
+    }
+
+    #[cfg(feature = "crossbeam")]
+    #[inline(always)]
+    async fn poll_push_array_mut<T: AnyBox<'a>>(&mut self, values: Box<[T]>) -> Result<&'a mut [T], Error> {
+        Ok(self.stack.push_array_mut(values))
+    }
+
+    #[cfg(not(feature = "crossbeam"))]
+    #[inline(always)]
+    async fn poll_push<T: AnyBox<'a>>(&mut self, _value: Box<T>) -> Result<&'a T, Error> {
+        Err(Error::Stack("References disabled".to_string()))
+    }
+
+    #[cfg(not(feature = "crossbeam"))]
+    #[inline(always)]
+    async fn poll_push_mut<T: AnyBox<'a>>(&mut self, _value: Box<T>) -> Result<&'a mut T, Error> {
+        Err(Error::Stack("References disabled".to_string()))
+    }
+
+    #[cfg(not(feature = "crossbeam"))]
+    #[inline(always)]
+    async fn poll_push_array<T: AnyBox<'a>>(&mut self, _values: Box<[T]>) -> Result<&'a [T], Error> {
+        Err(Error::Stack("References disabled".to_string()))
+    }
+
+    #[cfg(not(feature = "crossbeam"))]
+    #[inline(always)]
+    async fn poll_push_array_mut<T: AnyBox<'a>>(&mut self, _values: Box<[T]>) -> Result<&'a mut [T], Error> {
+        Err(Error::Stack("References disabled".to_string()))
     }
 }
 
@@ -132,9 +240,9 @@ impl AsyncMiddleware for Next<'_> {
 /// Provides basic read and write operations for `Cow<'_, [u8]>`:
 /// - `fn write<T>(&mut self, data: &[T]) -> Result<(), Error>`:
 ///     - Writes data to the underlying `Cow` buffer, ensuring the size of `T` is 1 byte.
-/// - `fn read<'a, 'b, T>(&'b mut self, nbytes: usize) -> Result<&'a [T], Error>`:
+/// - `fn read<'a, T>(&mut self, nbytes: usize) -> Result<&'a [T], Error>`:
 ///     - Reads data from the underlying `Cow` buffer, ensuring the size of `T` is 1 byte.
-/// - `fn read_mut<'a, 'b, T>(&'b mut self, nbytes: usize) -> Result<&'a [T], Error>`:
+/// - `fn read_mut<'a, T>(&mut self, nbytes: usize) -> Result<&'a mut [T], Error>`:
 ///     - Reads data as mut from the underlying `Cow` buffer, ensuring the size of `T` is 1 byte.
 pub trait CowRw {
     fn write<T>(&mut self, data: &[T]) -> Result<(), Error>;
@@ -196,25 +304,41 @@ impl CowRw for (Cow<'_, [u8]>, usize) {
 /// # Structs
 /// ## Next<'a>
 /// A wrapper around a `Cow<'a, [u8]>` buffer, providing methods for creating and managing the buffer:
+/// - `pub fn from_mut(cow: &'a mut Cow<'_, [u8]>) -> Self`:
+///     - Creates a new `Next` instance from a mutable reference to a `Cow` buffer.
 /// - `pub fn with_mtu(mtu: usize) -> Self`:
 ///     - Creates a new `Next` instance with a buffer capacity specified by `mtu`.
 /// - `impl<'a> Default for Next<'a>`:
 ///     - Provides a default implementation that creates a `Next` instance with an empty buffer.
+/// - `impl<'a, T: Into<Cow<'a, [u8]>>> From<T> for Next<'a>`:
+///     - Provides an implementation that creates a `Next` instance from a value that can be converted
+///       into a `Cow` buffer.
+/// - `pub fn serialized(&self) -> Vec<u8>`:
+///     - Returns a vector containing the serialized data from the underlying buffer.
+/// - `pub fn as_slice(&'a self) -> &'a [u8]`:
+///     - Returns a slice of the underlying buffer.
 #[derive(Clone, Debug)]
 pub struct Next<'a>{
-    buf: (Cow<'a, [u8]>, usize)
+    buf: (Cow<'a, [u8]>, usize),
+
+    #[cfg(feature = "crossbeam")]
+    stack: Stack<'a>,
 }
 
 impl<'a> Next<'a> {
     pub fn from_mut(cow: &'a mut Cow<'_, [u8]>) -> Self {
         Self {
             buf: (Cow::Borrowed(&*cow), 0),
+            #[cfg(feature = "crossbeam")]
+            stack: Stack::new(),
         }
     }
 
     pub fn with_mtu(mtu: usize) -> Self {
         Self {
             buf: (Cow::from(Vec::with_capacity(mtu)), 0),
+            #[cfg(feature = "crossbeam")]
+            stack: Stack::new(),
         }
     }
 
@@ -233,6 +357,8 @@ impl<'a> Default for Next<'a> {
     fn default() -> Self {
         Self {
             buf: (Cow::from(Vec::new()), 0),
+            #[cfg(feature = "crossbeam")]
+            stack: Stack::new(),
         }
     }
 }
@@ -241,6 +367,8 @@ impl<'a, T: Into<Cow<'a, [u8]>>> From<T> for Next<'a> {
     fn from(value: T) -> Self {
         Self {
             buf: (value.into(), 0),
+            #[cfg(feature = "crossbeam")]
+            stack: Stack::new(),
         }
     }
 }
@@ -250,7 +378,13 @@ impl<'a, T: Into<Cow<'a, [u8]>>> From<T> for Next<'a> {
 /// and their locations in the payload structure. Requires the `info` feature to be enabled.
 #[cfg(feature = "info")]
 #[derive(Clone, Debug)]
-pub struct NextTrace<'a>((Cow<'a, [u8]>, usize), usize, LinkedList<&'static str>);
+pub struct NextTrace<'a> {
+    buf: (Cow<'a, [u8]>, usize), 
+    depth: usize, 
+    path: LinkedList<&'static str>,
+    #[cfg(feature = "crossbeam")]
+    stack: Stack<'a>
+}
 
 #[cfg(feature = "info")]
 const MAX_NESTED_DEPTH: usize = 255;
@@ -258,59 +392,89 @@ const MAX_NESTED_DEPTH: usize = 255;
 #[cfg(feature = "info")]
 impl<'a> NextTrace<'a> {
     pub fn from_mut(cow: &'a mut Cow<'_, [u8]>) -> Self {
-        Self((Cow::Borrowed(&*cow), 0), MAX_NESTED_DEPTH, LinkedList::new())
+        Self {
+            buf: (Cow::Borrowed(&*cow), 0), 
+            depth: MAX_NESTED_DEPTH, 
+            path: LinkedList::new(),
+            #[cfg(feature = "crossbeam")]
+            stack: Stack::new(),
+        }
     }
 
     pub fn with_mtu(mtu: usize) -> Self {
-        Self((Cow::from(Vec::with_capacity(mtu)), 0), MAX_NESTED_DEPTH, LinkedList::new())
+        Self {
+            buf: (Cow::from(Vec::with_capacity(mtu)), 0), 
+            depth: MAX_NESTED_DEPTH, 
+            path: LinkedList::new(),
+            #[cfg(feature = "crossbeam")]
+            stack: Stack::new(),
+        }
     }
 
     pub fn with_depth(depth: usize) -> Self {
-        Self((Cow::from(Vec::new()), 0), depth, LinkedList::new())
+        Self {
+            buf: (Cow::from(Vec::new()), 0), 
+            depth, 
+            path: LinkedList::new(),
+            #[cfg(feature = "crossbeam")]
+            stack: Stack::new(),
+        }
     }
 
     #[inline(always)]
     pub fn serialized(&self) -> Vec<u8> {
-        self.0.0.to_vec()
+        self.buf.0.to_vec()
     }
 
     #[inline(always)]
     pub fn as_slice(&'a self) -> &'a [u8] { 
-        self.0.0.as_ref()
+        self.buf.0.as_ref()
     }
 }
 
 #[cfg(feature = "info")]
 impl<'a, T: Into<Cow<'a, [u8]>>> From<T> for NextTrace<'a> {
     fn from(value: T) -> Self {
-        Self((value.into(), 0), MAX_NESTED_DEPTH, LinkedList::new())
+        Self {
+            buf: (value.into(), 0), 
+            depth: MAX_NESTED_DEPTH, 
+            path: LinkedList::new(),
+            #[cfg(feature = "crossbeam")]
+            stack: Stack::new(),
+        }
     }
 }
 
 #[cfg(feature = "info")]
 impl<'a> Default for NextTrace<'a> {
     fn default() -> Self {
-        NextTrace((Cow::from(Vec::new()), 0), MAX_NESTED_DEPTH, LinkedList::new())
+        Self {
+            buf: (Cow::from(Vec::new()), 0), 
+            depth: MAX_NESTED_DEPTH, 
+            path: LinkedList::new(),
+            #[cfg(feature = "crossbeam")]
+            stack: Stack::new(),
+        }
     }
 }
 
 #[cfg(feature = "info")]
 #[cfg(feature = "sync")]
-impl Middleware for NextTrace<'_> {
+impl<'a> Middleware<'a> for NextTrace<'a> {
     #[inline(always)]
     fn into_payload<C, T: IntoPayload<C>>(&mut self, value: &T, ctx: &mut C) -> Result<(), Error> {
-        if self.2.len() > self.1 {
+        if self.path.len() > self.depth {
             return Err(Error::NestedDepthLimit(T::TYPE.to_string()))
         }
 
-        self.2.push_back(T::TYPE);
+        self.path.push_back(T::TYPE);
  
-        let path: Vec<&str> = self.2.iter().cloned().collect();
+        let path: Vec<&str> = self.path.iter().cloned().collect();
         println!("{}", path.join(" -> "));
 
         match value.into_payload(ctx, self) {
             Ok(value) => {
-                self.2.pop_back();
+                self.path.pop_back();
 
                 Ok(value)
             },
@@ -318,7 +482,7 @@ impl Middleware for NextTrace<'_> {
                 match error {
                     Error::Traced(_, _) => Err(error),
                     _ => {
-                        let path: Vec<&str> = self.2.iter().cloned().collect();
+                        let path: Vec<&str> = self.path.iter().cloned().collect();
                         Err(Error::Traced(error.to_string(), path.join(" -> ")))
                     }
                 }
@@ -327,22 +491,19 @@ impl Middleware for NextTrace<'_> {
     }
 
     #[inline(always)]
-    fn from_payload<'a, 'b, C, T: FromPayload<'a, C>>(&mut self, ctx: &mut C) -> Result<T, Error>
-        where
-            'a: 'b 
-    {
-        if self.2.len() > self.1 {
+    fn from_payload<C, T: FromPayload<'a, C>>(&mut self, ctx: &mut C) -> Result<T, Error> {
+        if self.path.len() > self.depth {
             return Err(Error::NestedDepthLimit(T::TYPE.to_string()))
         }
 
-        self.2.push_back(T::TYPE);
+        self.path.push_back(T::TYPE);
 
-        let path: Vec<&str> = self.2.iter().cloned().collect();
+        let path: Vec<&str> = self.path.iter().cloned().collect();
         println!("{}", path.join(" <- "));
 
         match T::from_payload(ctx, self) {
             Ok(value) => {
-                self.2.pop_back();
+                self.path.pop_back();
 
                 Ok(value)
             },
@@ -350,7 +511,7 @@ impl Middleware for NextTrace<'_> {
                 match error {
                     Error::Traced(_, _) => Err(error),
                     _ => {
-                        let path: Vec<&str> = self.2.iter().cloned().collect();
+                        let path: Vec<&str> = self.path.iter().cloned().collect();
                         Err(Error::Traced(error.to_string(), path.join(" <- ")))
                     }
                 }
@@ -360,47 +521,91 @@ impl Middleware for NextTrace<'_> {
 
     #[inline(always)]
     fn write<T>(&mut self, data: &[T]) -> Result<(), Error> {
-        self.0.write(data)
+        self.buf.write(data)
     }
 
     #[inline(always)]
-    fn read<'a, 'b, T>(&'b mut self, nbytes: usize) -> Result<&'a [T], Error> {
-        self.0.read(nbytes)
+    fn read<T>(&mut self, nbytes: usize) -> Result<&'a [T], Error> {
+        self.buf.read(nbytes)
     }
 
     #[inline(always)]
-    fn read_mut<'a, 'b, T>(&'b mut self, nbytes: usize) -> Result<&'a mut [T], Error> {
-        self.0.read_mut(nbytes)
+    fn read_mut<T>(&mut self, nbytes: usize) -> Result<&'a mut [T], Error> {
+        self.buf.read_mut(nbytes)
+    }
+
+    #[cfg(feature = "crossbeam")]
+    fn push<T: AnyBox<'a>>(&mut self, value: Box<T>) -> Result<&'a T, Error> {
+        Ok(self.stack.push(value))
+    }
+
+    #[cfg(feature = "crossbeam")]
+    fn push_mut<T: AnyBox<'a>>(&mut self, value: Box<T>) -> Result<&'a mut T, Error> {
+        Ok(self.stack.push_mut(value))
+    }
+
+    #[cfg(feature = "crossbeam")]
+    fn push_array<T: AnyBox<'a>>(&mut self, values: Box<[T]>) -> Result<&'a [T], Error> {
+        Ok(self.stack.push_array(values))
+    }
+
+    #[cfg(feature = "crossbeam")]
+    fn push_array_mut<T: AnyBox<'a>>(&mut self, values: Box<[T]>) -> Result<&'a mut [T], Error> {
+        Ok(self.stack.push_array_mut(values))
+    }
+
+    #[cfg(not(feature = "crossbeam"))]
+    #[inline(always)]
+    fn push<T: AnyBox<'a>>(&mut self, _value: Box<T>) -> Result<&'a T, Error> {
+        Err(Error::Stack("References disabled".to_string()))
+    }
+
+    #[cfg(not(feature = "crossbeam"))]
+    #[inline(always)]
+    fn push_mut<T: AnyBox<'a>>(&mut self, _value: Box<T>) -> Result<&'a mut T, Error> {
+        Err(Error::Stack("References disabled".to_string()))
+    }
+
+    #[cfg(not(feature = "crossbeam"))]
+    #[inline(always)]
+    fn push_array<T: AnyBox<'a>>(&mut self, _values: Box<[T]>) -> Result<&'a [T], Error> {
+        Err(Error::Stack("References disabled".to_string()))
+    }
+
+    #[cfg(not(feature = "crossbeam"))]
+    #[inline(always)]
+    fn push_array_mut<T: AnyBox<'a>>(&mut self, _values: Box<[T]>) -> Result<&'a mut [T], Error> {
+        Err(Error::Stack("References disabled".to_string()))
     }
 }
 
 #[cfg(feature = "info")]
 #[cfg(feature = "async")]
-impl AsyncMiddleware for NextTrace<'_> {
+impl<'a> AsyncMiddleware<'a> for NextTrace<'a> {
     async fn poll_into_payload<C: Send + Sync, T: AsyncIntoPayload<C>>(
         &mut self,
         value: &T,
         ctx: &mut C
     ) -> Result<(), Error> {
-        if self.2.len() > self.1 {
+        if self.path.len() > self.depth {
             return Err(Error::NestedDepthLimit(T::TYPE.to_string()));
         }
 
-        self.2.push_back(T::TYPE);
+        self.path.push_back(T::TYPE);
 
-        let path: Vec<&str> = self.2.iter().cloned().collect();
+        let path: Vec<&str> = self.path.iter().cloned().collect();
         println!("{}", path.join(" -> "));
 
         match value.poll_into_payload(ctx, self).await {
             Ok(value) => {
-                self.2.pop_back();
+                self.path.pop_back();
                 Ok(value)
             }
             Err(error) => {
                 match error {
                     Error::Traced(_, _) => Err(error),
                     _ => {
-                        let path: Vec<&str> = self.2.iter().cloned().collect();
+                        let path: Vec<&str> = self.path.iter().cloned().collect();
                         Err(Error::Traced(error.to_string(), path.join(" -> ")))
                     }
                 }
@@ -408,31 +613,29 @@ impl AsyncMiddleware for NextTrace<'_> {
         }
     }
 
-    async fn poll_from_payload<'a, 'b, C: Send + Sync, T: AsyncFromPayload<'a, C> + Send + Sync> (
-        &'b mut self, 
+    async fn poll_from_payload<C: Send + Sync, T: AsyncFromPayload<'a, C> + Send + Sync> (
+        &mut self, 
         ctx: &mut C,
-    ) -> Result<T, Error>
-        where 'a: 'b,
-    {
-        if self.2.len() > self.1 {
+    ) -> Result<T, Error> {
+        if self.path.len() > self.depth {
             return Err(Error::NestedDepthLimit(T::TYPE.to_string()));
         }
 
-        self.2.push_back(T::TYPE);
+        self.path.push_back(T::TYPE);
 
-        let path: Vec<&str> = self.2.iter().cloned().collect();
+        let path: Vec<&str> = self.path.iter().cloned().collect();
         println!("{}", path.join(" <- "));
 
         match T::poll_from_payload(ctx, self).await {
             Ok(value) => {
-                self.2.pop_back();
+                self.path.pop_back();
                 Ok(value)
             }
             Err(error) => {
                 match error {
                     Error::Traced(_, _) => Err(error),
                     _ => {
-                        let path: Vec<&str> = self.2.iter().cloned().collect();
+                        let path: Vec<&str> = self.path.iter().cloned().collect();
                         Err(Error::Traced(error.to_string(), path.join(" <- ")))
                     }
                 }
@@ -442,16 +645,64 @@ impl AsyncMiddleware for NextTrace<'_> {
 
     #[inline(always)]
     async fn poll_write<T>(&mut self, data: &[T]) -> Result<(), Error> {
-        self.0.write(data)
+        self.buf.write(data)
     }
 
     #[inline(always)]
-    async fn poll_read<'a, 'b, T: 'a>(&mut self, nbytes: usize) -> Result<&'a [T], Error> {
-        self.0.read(nbytes)
+    async fn poll_read<T: 'a>(&mut self, nbytes: usize) -> Result<&'a [T], Error> {
+        self.buf.read(nbytes)
     }
 
     #[inline(always)]
-    async fn poll_read_mut<'a, 'b, T: 'a>(&mut self, nbytes: usize) -> Result<&'a mut [T], Error> {
-        self.0.read_mut(nbytes)
+    async fn poll_read_mut<T: 'a>(&mut self, nbytes: usize) -> Result<&'a mut [T], Error> {
+        self.buf.read_mut(nbytes)
+    }
+
+    #[cfg(feature = "crossbeam")]
+    #[inline(always)]
+    async fn poll_push<T: AnyBox<'a>>(&mut self, value: Box<T>) -> Result<&'a T, Error> {
+        Ok(self.stack.push(value))
+    }
+
+    #[cfg(feature = "crossbeam")]
+    #[inline(always)]
+    async fn poll_push_mut<T: AnyBox<'a>>(&mut self, value: Box<T>) -> Result<&'a mut T, Error> {
+        Ok(self.stack.push_mut(value))
+    }
+
+    #[cfg(feature = "crossbeam")]
+    #[inline(always)]
+    async fn poll_push_array<T: AnyBox<'a>>(&mut self, values: Box<[T]>) -> Result<&'a [T], Error> {
+        Ok(self.stack.push_array(values))
+    }
+
+    #[cfg(feature = "crossbeam")]
+    #[inline(always)]
+    async fn poll_push_array_mut<T: AnyBox<'a>>(&mut self, values: Box<[T]>) -> Result<&'a mut [T], Error> {
+        Ok(self.stack.push_array_mut(values))
+    }
+
+    #[cfg(not(feature = "crossbeam"))]
+    #[inline(always)]
+    async fn poll_push<T: AnyBox<'a>>(&mut self, _value: Box<T>) -> Result<&'a T, Error> {
+        Err(Error::Stack("References disabled".to_string()))
+    }
+
+    #[cfg(not(feature = "crossbeam"))]
+    #[inline(always)]
+    async fn poll_push_mut<T: AnyBox<'a>>(&mut self, _value: Box<T>) -> Result<&'a mut T, Error> {
+        Err(Error::Stack("References disabled".to_string()))
+    }
+
+    #[cfg(not(feature = "crossbeam"))]
+    #[inline(always)]
+    async fn poll_push_array<T: AnyBox<'a>>(&mut self, _values: Box<[T]>) -> Result<&'a [T], Error> {
+        Err(Error::Stack("References disabled".to_string()))
+    }
+
+    #[cfg(not(feature = "crossbeam"))]
+    #[inline(always)]
+    async fn poll_push_array_mut<T: AnyBox<'a>>(&mut self, _values: Box<[T]>) -> Result<&'a mut [T], Error> {
+        Err(Error::Stack("References disabled".to_string()))
     }
 }

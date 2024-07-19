@@ -7,16 +7,14 @@ macro_rules! async_payload_be_bytes {
     ($type:ty) => {
         impl<C: Send + Sync> AsyncIntoPayload<C> for $type {
             #[inline]
-            async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, _ctx: &mut C, next: &'b mut M) -> Result<(), Error> {
+            async fn poll_into_payload<'m, M: AsyncMiddleware<'m>>(&self, _ctx: &mut C, next: &mut M) -> Result<(), Error> {
                 next.poll_write(&self.to_be_bytes()).await
             }
         }
         
         impl<'a, C: Send + Sync> AsyncFromPayload<'a, C> for $type {
             #[inline]
-            async fn poll_from_payload<'b, M: AsyncMiddleware>(_ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-                where 'a: 'b,
-            {
+            async fn poll_from_payload<M: AsyncMiddleware<'a>>(_ctx: &mut C, next: &mut M) -> Result<Self, Error> {
                 let slice: &[u8] = next.poll_read(mem::size_of::<Self>()).await?;
 
                 Ok(<Self>::from_be_bytes(unsafe {
@@ -25,7 +23,7 @@ macro_rules! async_payload_be_bytes {
             }
         }
 
-        impl<C: Send + Sync> AsyncPayload<C> for $type {}
+        impl<'a, C: Send + Sync> AsyncPayload<'a, C> for $type {}
     };
 }
 
@@ -44,25 +42,22 @@ async_payload_be_bytes!(f64);
 
 impl<C: Send + Sync> AsyncIntoPayload<C> for isize {
     #[inline]
-    async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error> {
+    async fn poll_into_payload<'m, M: AsyncMiddleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
         next.poll_into_payload(&(*self as i64), ctx).await
     }
 }
 
 impl<'a, C: Send + Sync> AsyncFromPayload<'a, C> for isize {
-    #[inline]
-    async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where 'a: 'b,
-    {
+    async fn poll_from_payload<M: AsyncMiddleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         let value: i64 = next.poll_from_payload(ctx).await?;
         Ok(value as Self)
     }
 }
 
-impl<C: Send + Sync> AsyncPayload<C> for isize {}
+impl<'a, C: Send + Sync> AsyncPayload<'a, C> for isize {}
 
 impl<C: Send + Sync> AsyncIntoPayload<C> for usize {
-    async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error> {
+    async fn poll_into_payload<'m, M: AsyncMiddleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
         let mut value = *self;
         const CONTINUATION_BIT: u8 = 0b1000_0000;
         const DATA_BITS: usize = 7;
@@ -83,9 +78,7 @@ impl<C: Send + Sync> AsyncIntoPayload<C> for usize {
 }
 
 impl<'a, C: Send + Sync> AsyncFromPayload<'a, C> for usize {
-    async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error> 
-        where 'a: 'b,
-    {
+    async fn poll_from_payload<M: AsyncMiddleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         const CONTINUATION_BIT: u8 = 0b1000_0000;
         const DATA_BITS: u8 = 7;
 
@@ -113,27 +106,24 @@ impl<'a, C: Send + Sync> AsyncFromPayload<'a, C> for usize {
     }
 }
 
-impl<C: Send + Sync> AsyncPayload<C> for usize {}
+impl<'a, C: Send + Sync> AsyncPayload<'a, C> for usize {}
 
 impl<C: Send + Sync> AsyncIntoPayload<C> for () {
-    async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, _ctx: &mut C, _next: &'b mut M) -> Result<(), Error> {
+    async fn poll_into_payload<'b, M: AsyncMiddleware<'b>>(&self, _ctx: &mut C, _next: &mut M) -> Result<(), Error> {
         Ok(())
     }
 }
 
 impl<'a, C: Send + Sync> AsyncFromPayload<'a, C> for () {
-    async fn poll_from_payload<'b, M: AsyncMiddleware>(_ctx: &mut C, _next: &'b mut M) -> Result<Self, Error> 
-        where
-            'a: 'b
-    {
+    async fn poll_from_payload<M: AsyncMiddleware<'a>>(_ctx: &mut C, _next: &mut M) -> Result<Self, Error> {
         Ok(())
     }
 }
 
-impl<C: Send + Sync> AsyncPayload<C> for () {}
+impl<'a, C: Send + Sync> AsyncPayload<'a, C> for () {}
 
 impl<C: Send + Sync> AsyncIntoPayload<C> for bool {
-    async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error> {
+    async fn poll_into_payload<'m, M: AsyncMiddleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
         if *self {
             next.poll_into_payload(&1u8, ctx).await
         } else {
@@ -143,9 +133,7 @@ impl<C: Send + Sync> AsyncIntoPayload<C> for bool {
 }
 
 impl<'a, C: Send + Sync> AsyncFromPayload<'a, C> for bool {
-    async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where 'a: 'b,
-    {
+    async fn poll_from_payload<M: AsyncMiddleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         let byte: u8 = next.poll_from_payload(ctx).await?;
 
         if byte != 0 {
@@ -156,4 +144,4 @@ impl<'a, C: Send + Sync> AsyncFromPayload<'a, C> for bool {
     }
 }
 
-impl<C: Send + Sync> AsyncPayload<C> for bool {}
+impl<'a, C: Send + Sync> AsyncPayload<'a, C> for bool {}

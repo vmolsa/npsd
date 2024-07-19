@@ -7,7 +7,7 @@ macro_rules! payload_tuple {
             where
                 $($T: IntoPayload<X>,)+
         {
-            fn into_payload<Y: Middleware>(&self, ctx: &mut X, next: &mut Y) -> Result<(), Error> {
+            fn into_payload<'a, Y: Middleware<'a>>(&self, ctx: &mut X, next: &mut Y) -> Result<(), Error> {
                 $(
                     next.into_payload(&self.$i, ctx)?;
                 )+
@@ -20,18 +20,16 @@ macro_rules! payload_tuple {
             where
                 $($T: FromPayload<'a, X>,)+
         {
-            fn from_payload<'b, Y: Middleware>(ctx: &mut X, next: &'b mut Y) -> Result<Self, Error>
-                where 'a: 'b,
-            {
+            fn from_payload<Y: Middleware<'a>>(ctx: &mut X, next: &mut Y) -> Result<Self, Error> {
                 Ok(($(
                     next.from_payload::<X, $T>(ctx)?,
                 )+))
             }
         }
 
-        impl<X, $($T),+> Payload<X> for ($($T,)+) 
+        impl<'a, X, $($T),+> Payload<'a, X> for ($($T,)+) 
             where
-                $($T: Payload<X>,)+ {}
+                $($T: Payload<'a, X>,)+ {}
     };
 }
 

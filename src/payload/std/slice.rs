@@ -1,9 +1,11 @@
 use core::mem;
 
+use crate::AnyBox;
+
 use super::{Error, Middleware, Payload, IntoPayload, FromPayload};
 
 impl<'a, C, T: IntoPayload<C>> IntoPayload<C> for &'a [T] {
-    fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
+    fn into_payload<'m, M: Middleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
         if mem::size_of::<T>() == 1 {
             next.into_payload(&self.len(), ctx)?;
             next.write(self)?;
@@ -19,10 +21,8 @@ impl<'a, C, T: IntoPayload<C>> IntoPayload<C> for &'a [T] {
     }
 }
 
-impl<'a, C, T: FromPayload<'a, C>> FromPayload<'a, C> for &'a [T] {
-    fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error> 
-        where 'a: 'b,
-    {
+impl<'a, C, T: FromPayload<'a, C> + AnyBox<'a>> FromPayload<'a, C> for &'a [T] {
+    fn from_payload<M: Middleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         let len: usize = next.from_payload(ctx)?;
 
         if mem::size_of::<T>() == 1 {
@@ -34,25 +34,22 @@ impl<'a, C, T: FromPayload<'a, C>> FromPayload<'a, C> for &'a [T] {
                 vec.push(next.from_payload::<C, T>(ctx)?);
             }
 
-            // TODO(): Replace Box::leak()
-            Ok(Box::leak(vec.into_boxed_slice()))
+            next.push_array(vec.into_boxed_slice())
         }
     }
 }
 
-impl<'a, C, T: Payload<C>> Payload<C> for &'a [T] {}
+impl<'a, C, T: Payload<'a, C> + AnyBox<'a>> Payload<'a, C> for &'a [T] {}
 
 impl<'a, C, T: IntoPayload<C>> IntoPayload<C> for &mut [T] {
     #[inline]
-    fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
+    fn into_payload<'m, M: Middleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
         next.into_payload::<C, &[T]>(&self.as_ref(), ctx)
     }
 }
 
-impl<'a, C, T: FromPayload<'a, C>> FromPayload<'a, C> for &'a mut [T] where T: Clone {
-    fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where 'a: 'b,
-    {
+impl<'a, C, T: FromPayload<'a, C> + AnyBox<'a>> FromPayload<'a, C> for &'a mut [T] where T: Clone {
+    fn from_payload<M: Middleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         if mem::size_of::<T>() == 1 {
             let nbytes: usize = next.from_payload(ctx)?;
 
@@ -60,17 +57,16 @@ impl<'a, C, T: FromPayload<'a, C>> FromPayload<'a, C> for &'a mut [T] where T: C
         } else {
             let vec: Vec<T> = next.from_payload(ctx)?;
 
-            // TODO(): Replace Box::leak()
-            Ok(Box::leak(vec.into_boxed_slice()))
+            next.push_array_mut(vec.into_boxed_slice())
         }
     }
 }
 
-impl<'a, C, T: Payload<C>> Payload<C> for &'a mut [T] 
+impl<'a, C, T: Payload<'a, C> + AnyBox<'a>> Payload<'a, C> for &'a mut [T] 
     where T: Clone {}
 
-impl<C, T: IntoPayload<C>, const N: usize> IntoPayload<C> for [T; N] {
-    fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
+impl<'a, C, T: IntoPayload<C>, const N: usize> IntoPayload<C> for [T; N] {
+    fn into_payload<'m, M: Middleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
         if mem::size_of::<T>() == 1 {
             next.write(self)?;
         } else {
@@ -83,12 +79,10 @@ impl<C, T: IntoPayload<C>, const N: usize> IntoPayload<C> for [T; N] {
     }
 }
 
-impl<'a, C, T: FromPayload<'a, C> + 'a, const N: usize> FromPayload<'a, C> for [T; N] 
+impl<'a, C, T: FromPayload<'a, C> + AnyBox<'a> + 'a, const N: usize> FromPayload<'a, C> for [T; N] 
     where T: Copy
 {
-    fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where 'a: 'b,
-    {
+    fn from_payload<M: Middleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         if mem::size_of::<T>() == 1 {
             let bytes: &[T] = next.read(N)?;
 
@@ -102,10 +96,11 @@ impl<'a, C, T: FromPayload<'a, C> + 'a, const N: usize> FromPayload<'a, C> for [
                 vec.push(next.from_payload::<C, T>(ctx)?);
             }
 
-            // TODO(): Replace vec.leak()
-            Ok(unsafe { *(vec.leak().as_ptr() as *const [T; N]) })
+            let slice = next.push_array(vec.into_boxed_slice())?;
+
+            Ok(unsafe { *(slice.as_ptr() as *const [T; N]) })
         }
     }
 }
 
-impl<C, T: Payload<C>, const N: usize> Payload<C> for [T; N] where T: Copy {}
+impl<'a, C, T: Payload<'a, C> + AnyBox<'a>, const N: usize> Payload<'a, C> for [T; N] where T: Copy {}

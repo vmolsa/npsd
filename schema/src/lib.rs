@@ -99,7 +99,7 @@ fn schema_from_impl(generics: &mut Generics, internal: bool, lifetime: &Lifetime
 }
 
 #[doc(hidden)]
-fn schema_payload_impl(generics: &mut Generics, internal: bool, context: &Ident) {
+fn schema_payload_impl(generics: &mut Generics, internal: bool, lifetime: &Lifetime, context: &Ident) {
     for param in generics.params.iter_mut() {
         if let GenericParam::Type(type_param) = param {
             if type_param.ident == DEFAULT_CONTEXT {
@@ -108,9 +108,9 @@ fn schema_payload_impl(generics: &mut Generics, internal: bool, context: &Ident)
 
             if !has_bound(&type_param.bounds, "Payload") {
                 type_param.bounds.push(if internal {
-                    parse_quote!(Payload<#context>)
+                    parse_quote!(Payload<#lifetime, #context>)
                 } else {
-                    parse_quote!(npsd::Payload<#context>)
+                    parse_quote!(npsd::Payload<#lifetime, #context>)
                 });
             }
         }
@@ -156,7 +156,7 @@ fn async_schema_from_impl(generics: &mut Generics, internal: bool, lifetime: &Li
 }
 
 #[doc(hidden)]
-fn async_schema_payload_impl(generics: &mut Generics, internal: bool, context: &Ident) {
+fn async_schema_payload_impl(generics: &mut Generics, internal: bool, lifetime: &Lifetime, context: &Ident) {
     for param in generics.params.iter_mut() {
         if let GenericParam::Type(type_param) = param {
             if type_param.ident == DEFAULT_CONTEXT {
@@ -165,9 +165,9 @@ fn async_schema_payload_impl(generics: &mut Generics, internal: bool, context: &
 
             if !has_bound(&type_param.bounds, "AsyncPayload") {
                 type_param.bounds.push(if internal {
-                    parse_quote!(AsyncPayload<#context>)
+                    parse_quote!(AsyncPayload<#lifetime, #context>)
                 } else {
-                    parse_quote!(npsd::AsyncPayload<#context>)
+                    parse_quote!(npsd::AsyncPayload<#lifetime, #context>)
                 });
             }
         }
@@ -235,7 +235,8 @@ fn schema_impl(input: TokenStream, internal: bool) -> TokenStream {
 
     if !lifetime_exist {
         let lifetime_param = LifetimeParam::new(lifetime.clone());
-        from_generics.params.insert(0, GenericParam::Lifetime(lifetime_param));
+        from_generics.params.insert(0, GenericParam::Lifetime(lifetime_param.clone()));
+        payload_generics.params.insert(0, GenericParam::Lifetime(lifetime_param.clone()));
     }
 
     schema_into_impl(&mut into_generics, internal, &context);
@@ -244,7 +245,7 @@ fn schema_impl(input: TokenStream, internal: bool) -> TokenStream {
     schema_from_impl(&mut from_generics, internal, &lifetime, &context);
     let (from_impl, _, _) = from_generics.split_for_impl();
 
-    schema_payload_impl(&mut payload_generics, internal, &context);
+    schema_payload_impl(&mut payload_generics, internal, &lifetime, &context);
     let (payload_impl, _, _) = payload_generics.split_for_impl();
 
     let sender_block = match data.clone() {
@@ -451,42 +452,36 @@ fn schema_impl(input: TokenStream, internal: bool) -> TokenStream {
     let gen = if internal {
         quote! {
             impl #into_impl IntoPayload<#context> for #ident #ty_generics #where_clause {
-                fn into_payload<#mw: Middleware>(&self, ctx: &mut #context, next: &mut #mw) -> Result<(), Error> {
+                fn into_payload<#scope, #mw: Middleware<#scope>>(&self, ctx: &mut #context, next: &mut #mw) -> Result<(), Error> {
                     #sender_block
                     Ok(())
                 }
             }
 
             impl #from_impl FromPayload<#lifetime, #context> for #ident #ty_generics #where_clause {
-                fn from_payload<#scope, #mw: Middleware>(ctx: &mut #context, next: &#scope mut #mw) -> Result<Self, Error>
-                    where
-                        #lifetime: #scope
-                {
+                fn from_payload<#mw: Middleware<#lifetime>>(ctx: &mut #context, next: &mut #mw) -> Result<Self, Error> {
                     #receiver_block
                 }
             }
 
-            impl #payload_impl Payload<#context> for #ident #ty_generics #where_clause {}
+            impl #payload_impl Payload<#lifetime, #context> for #ident #ty_generics #where_clause {}
         }
     } else {
         quote! {
             impl #into_impl npsd::IntoPayload<#context> for #ident #ty_generics #where_clause {
-                fn into_payload<#mw: npsd::Middleware>(&self, ctx: &mut #context, next: &mut #mw) -> Result<(), npsd::Error> {
+                fn into_payload<#scope, #mw: npsd::Middleware<#scope>>(&self, ctx: &mut #context, next: &mut #mw) -> Result<(), npsd::Error> {
                     #sender_block
                     Ok(())
                 }
             }
 
             impl #from_impl npsd::FromPayload<#lifetime, #context> for #ident #ty_generics #where_clause {
-                fn from_payload<#scope, #mw: npsd::Middleware>(ctx: &mut #context, next: &#scope mut #mw) -> Result<Self, npsd::Error>
-                    where
-                        #lifetime: #scope
-                {
+                fn from_payload<#mw: npsd::Middleware<#lifetime>>(ctx: &mut #context, next: &mut #mw) -> Result<Self, npsd::Error> {
                     #receiver_block
                 }
             }
 
-            impl #payload_impl npsd::Payload<#context> for #ident #ty_generics #where_clause {}
+            impl #payload_impl npsd::Payload<#lifetime, #context> for #ident #ty_generics #where_clause {}
         }
     };
 
@@ -535,9 +530,9 @@ fn bitmap_impl(input: TokenStream, internal: bool) -> TokenStream {
     let context = Ident::new(DEFAULT_CONTEXT, Span::call_site());
     let mw = Ident::new(DEFAULT_MIDDLEWARE, Span::call_site());
 
-    let into_payload_impl = generate_into_payload_impl(&ident, &fields, &context, &mw, internal);
-    let from_payload_impl = generate_from_payload_impl(&ident, &fields, &lifetime, &scope, &context, &mw, internal);
-    let payload_impl = generate_payload_impl(&ident, &context, internal);
+    let into_payload_impl = generate_into_payload_impl(&ident, &fields, &scope, &context, &mw, internal);
+    let from_payload_impl = generate_from_payload_impl(&ident, &fields, &lifetime, &context, &mw, internal);
+    let payload_impl = generate_payload_impl(&ident, &lifetime,&context, internal);
 
     let expanded = quote! {
         #into_payload_impl
@@ -549,7 +544,7 @@ fn bitmap_impl(input: TokenStream, internal: bool) -> TokenStream {
 }
 
 #[doc(hidden)]
-fn generate_into_payload_impl(name: &Ident, fields: &Fields, context: &Ident, mw: &Ident, internal: bool) -> proc_macro2::TokenStream {
+fn generate_into_payload_impl(name: &Ident, fields: &Fields, scope: &Lifetime, context: &Ident, mw: &Ident, internal: bool) -> proc_macro2::TokenStream {
     let field_conversions = match fields {
         Fields::Named(FieldsNamed { named, .. }) => {
             named.iter().enumerate().map(|(i, f)| {
@@ -581,7 +576,7 @@ fn generate_into_payload_impl(name: &Ident, fields: &Fields, context: &Ident, mw
     if internal {
         quote! {
             impl<#context> IntoPayload<#context> for #name {
-                fn into_payload<#mw: Middleware>(&self, ctx: &mut #context, next: &mut #mw) -> Result<(), Error> {
+                fn into_payload<#scope, #mw: npsd::Middleware<#scope>>(&self, ctx: &mut #context, next: &mut #mw) -> Result<(), Error> {
                     let mut byte: u8 = 0;
                     #(#field_conversions)*
                     next.into_payload(&byte, ctx)
@@ -591,7 +586,7 @@ fn generate_into_payload_impl(name: &Ident, fields: &Fields, context: &Ident, mw
     } else {
         quote! {
             impl<#context> npsd::IntoPayload<#context> for #name {
-                fn into_payload<#mw: npsd::Middleware>(&self, ctx: &mut #context, next: &mut #mw) -> Result<(), npsd::Error> {
+                fn into_payload<#scope, #mw: npsd::Middleware<#scope>>(&self, ctx: &mut #context, next: &mut #mw) -> Result<(), npsd::Error> {
                     let mut byte: u8 = 0;
                     #(#field_conversions)*
                     next.into_payload(&byte, ctx)
@@ -602,7 +597,7 @@ fn generate_into_payload_impl(name: &Ident, fields: &Fields, context: &Ident, mw
 }
 
 #[doc(hidden)]
-fn generate_from_payload_impl(name: &Ident, fields: &Fields, lifetime: &Lifetime, scope: &Lifetime, context: &Ident, mw: &Ident, internal: bool) -> proc_macro2::TokenStream {
+fn generate_from_payload_impl(name: &Ident, fields: &Fields, lifetime: &Lifetime, context: &Ident, mw: &Ident, internal: bool) -> proc_macro2::TokenStream {
     let field_assignments = match fields {
         Fields::Named(FieldsNamed { named, .. }) => {
             named.iter().enumerate().map(|(i, f)| {
@@ -630,10 +625,7 @@ fn generate_from_payload_impl(name: &Ident, fields: &Fields, lifetime: &Lifetime
     if internal {
         quote! {
             impl<#lifetime, #context> FromPayload<#lifetime, #context> for #name {
-                fn from_payload<#scope, #mw: Middleware>(ctx: &mut #context, next: &#scope mut #mw) -> Result<Self, Error>
-                    where
-                        #lifetime: #scope
-                {
+                fn from_payload<#mw: Middleware<#lifetime>>(ctx: &mut #context, next: &mut #mw) -> Result<Self, Error> {
                     let byte: u8 = next.from_payload(ctx)?;
 
                     Ok(#name {
@@ -645,10 +637,7 @@ fn generate_from_payload_impl(name: &Ident, fields: &Fields, lifetime: &Lifetime
     } else {
         quote! {
             impl<#lifetime, #context> npsd::FromPayload<#lifetime, #context> for #name {
-                fn from_payload<#scope, #mw: npsd::Middleware>(ctx: &mut #context, next: &#scope mut #mw) -> Result<Self, npsd::Error>
-                    where
-                        #lifetime: #scope
-                {
+                fn from_payload<#mw: npsd::Middleware<#lifetime>>(ctx: &mut #context, next: &mut #mw) -> Result<Self, npsd::Error> {
                     let byte: u8 = next.from_payload(ctx)?;
 
                     Ok(#name {
@@ -661,14 +650,14 @@ fn generate_from_payload_impl(name: &Ident, fields: &Fields, lifetime: &Lifetime
 }
 
 #[doc(hidden)]
-fn generate_payload_impl(name: &Ident, context: &Ident, internal: bool) -> proc_macro2::TokenStream {
+fn generate_payload_impl(name: &Ident, lifetime: &Lifetime, context: &Ident, internal: bool) -> proc_macro2::TokenStream {
     if internal {
         quote! {
-            impl<#context> Payload<#context> for #name {}
+            impl<#lifetime, #context> Payload<#lifetime, #context> for #name {}
         }
     } else {
         quote! {
-            impl<#context> npsd::Payload<#context> for #name {}
+            impl<#lifetime, #context> npsd::Payload<#lifetime, #context> for #name {}
         }
     }
 }
@@ -711,7 +700,8 @@ fn async_schema_impl(input: TokenStream, internal: bool) -> TokenStream {
 
     if !lifetime_exist {
         let lifetime_param = LifetimeParam::new(lifetime.clone());
-        from_generics.params.insert(0, GenericParam::Lifetime(lifetime_param));
+        from_generics.params.insert(0, GenericParam::Lifetime(lifetime_param.clone()));
+        payload_generics.params.insert(0, GenericParam::Lifetime(lifetime_param.clone()));
     }
     
     async_schema_into_impl(&mut into_generics, internal, &context);
@@ -720,7 +710,7 @@ fn async_schema_impl(input: TokenStream, internal: bool) -> TokenStream {
     async_schema_from_impl(&mut from_generics, internal, &lifetime, &context);
     let (from_impl, _, _) = from_generics.split_for_impl();
 
-    async_schema_payload_impl(&mut payload_generics, internal, &context);
+    async_schema_payload_impl(&mut payload_generics, internal, &lifetime, &context);
     let (payload_impl, _, _) = payload_generics.split_for_impl();
 
     let sender_block = match data.clone() {
@@ -927,42 +917,36 @@ fn async_schema_impl(input: TokenStream, internal: bool) -> TokenStream {
     let gen = if internal {
         quote! {
             impl #into_impl AsyncIntoPayload<#context> for #ident #ty_generics #where_clause {
-                async fn poll_into_payload<#mw: AsyncMiddleware>(&self, ctx: &mut #context, next: &mut #mw) -> Result<(), Error> {
+                async fn poll_into_payload<#scope, #mw: AsyncMiddleware<#scope>>(&self, ctx: &mut #context, next: &mut #mw) -> Result<(), Error> {
                     #sender_block
                     Ok(())
                 }
             }
 
             impl #from_impl AsyncFromPayload<#lifetime, #context> for #ident #ty_generics #where_clause {
-                async fn poll_from_payload<#scope, #mw: AsyncMiddleware>(ctx: &mut #context, next: &#scope mut #mw) -> Result<Self, Error>
-                    where
-                        #lifetime: #scope
-                {
+                async fn poll_from_payload<#mw: AsyncMiddleware<#lifetime>>(ctx: &mut #context, next: &mut #mw) -> Result<Self, Error> {
                     #receiver_block
                 }
             }
 
-            impl #payload_impl AsyncPayload<#context> for #ident #ty_generics #where_clause {}
+            impl #payload_impl AsyncPayload<#lifetime, #context> for #ident #ty_generics #where_clause {}
         }
     } else {
         quote! {
             impl #into_impl npsd::AsyncIntoPayload<#context> for #ident #ty_generics #where_clause {
-                async fn poll_into_payload<#mw: npsd::AsyncMiddleware>(&self, ctx: &mut #context, next: &mut #mw) -> Result<(), npsd::Error> {
+                async fn poll_into_payload<#scope, #mw: npsd::AsyncMiddleware<#scope>>(&self, ctx: &mut #context, next: &mut #mw) -> Result<(), npsd::Error> {
                     #sender_block
                     Ok(())
                 }
             }
 
             impl #from_impl npsd::AsyncFromPayload<#lifetime, #context> for #ident #ty_generics #where_clause {
-                async fn poll_from_payload<#scope, #mw: npsd::AsyncMiddleware>(ctx: &mut #context, next: &#scope mut #mw) -> Result<Self, npsd::Error>
-                    where
-                        #lifetime: #scope
-                {
+                async fn poll_from_payload<#mw: npsd::AsyncMiddleware<#lifetime>>(ctx: &mut #context, next: &mut #mw) -> Result<Self, npsd::Error> {
                     #receiver_block
                 }
             }
 
-            impl #payload_impl npsd::AsyncPayload<#context> for #ident #ty_generics #where_clause {}
+            impl #payload_impl npsd::AsyncPayload<#lifetime, #context> for #ident #ty_generics #where_clause {}
         }
     };
 
@@ -1012,9 +996,9 @@ fn async_bitmap_impl(input: TokenStream, internal: bool) -> TokenStream {
     let context = Ident::new(DEFAULT_CONTEXT, Span::call_site());
     let mw = Ident::new(DEFAULT_MIDDLEWARE, Span::call_site());
 
-    let into_payload_impl = async_generate_into_payload_impl(&ident, &fields, &context, &mw, internal);
-    let from_payload_impl = async_generate_from_payload_impl(&ident, &fields, &lifetime, &scope, &context, &mw, internal);
-    let payload_impl = async_generate_payload_impl(&ident, &context, internal);
+    let into_payload_impl = async_generate_into_payload_impl(&ident, &fields, &scope, &context, &mw, internal);
+    let from_payload_impl = async_generate_from_payload_impl(&ident, &fields, &lifetime, &context, &mw, internal);
+    let payload_impl = async_generate_payload_impl(&ident, &lifetime, &context, internal);
 
     let expanded = quote! {
         #into_payload_impl
@@ -1026,7 +1010,7 @@ fn async_bitmap_impl(input: TokenStream, internal: bool) -> TokenStream {
 }
 
 #[doc(hidden)]
-fn async_generate_into_payload_impl(name: &Ident, fields: &Fields, context: &Ident, mw: &Ident, internal: bool) -> proc_macro2::TokenStream {
+fn async_generate_into_payload_impl(name: &Ident, fields: &Fields, scope: &Lifetime, context: &Ident, mw: &Ident, internal: bool) -> proc_macro2::TokenStream {
     let field_conversions = match fields {
         Fields::Named(FieldsNamed { named, .. }) => {
             named.iter().enumerate().map(|(i, f)| {
@@ -1058,7 +1042,7 @@ fn async_generate_into_payload_impl(name: &Ident, fields: &Fields, context: &Ide
     if internal {
         quote! {
             impl<#context: Send + Sync> AsyncIntoPayload<#context> for #name {
-                async fn poll_into_payload<#mw: AsyncMiddleware>(&self, ctx: &mut #context, next: &mut #mw) -> Result<(), Error> {
+                async fn poll_into_payload<#scope, #mw: AsyncMiddleware<#scope>>(&self, ctx: &mut #context, next: &mut #mw) -> Result<(), Error> {
                     let mut byte: u8 = 0;
                     #(#field_conversions)*
                     next.poll_into_payload(&byte, ctx).await
@@ -1068,7 +1052,7 @@ fn async_generate_into_payload_impl(name: &Ident, fields: &Fields, context: &Ide
     } else {
         quote! {
             impl<#context: Send + Sync> npsd::AsyncIntoPayload<#context> for #name {
-                async fn poll_into_payload<#mw: npsd::AsyncMiddleware>(&self, ctx: &mut #context, next: &mut #mw) -> Result<(), npsd::Error> {
+                async fn poll_into_payload<#scope, #mw: npsd::AsyncMiddleware<#scope>>(&self, ctx: &mut #context, next: &mut #mw) -> Result<(), npsd::Error> {
                     let mut byte: u8 = 0;
                     #(#field_conversions)*
                     next.poll_into_payload(&byte, ctx).await
@@ -1079,7 +1063,7 @@ fn async_generate_into_payload_impl(name: &Ident, fields: &Fields, context: &Ide
 }
 
 #[doc(hidden)]
-fn async_generate_from_payload_impl(name: &Ident, fields: &Fields, lifetime: &Lifetime, scope: &Lifetime, context: &Ident, mw: &Ident, internal: bool) -> proc_macro2::TokenStream {
+fn async_generate_from_payload_impl(name: &Ident, fields: &Fields, lifetime: &Lifetime, context: &Ident, mw: &Ident, internal: bool) -> proc_macro2::TokenStream {
     let field_assignments = match fields {
         Fields::Named(FieldsNamed { named, .. }) => {
             named.iter().enumerate().map(|(i, f)| {
@@ -1107,10 +1091,7 @@ fn async_generate_from_payload_impl(name: &Ident, fields: &Fields, lifetime: &Li
     if internal {
         quote! {
             impl<#lifetime, #context: Send + Sync> AsyncFromPayload<#lifetime, #context> for #name {
-                async fn poll_from_payload<#scope, #mw: AsyncMiddleware>(ctx: &mut #context, next: &#scope mut #mw) -> Result<Self, Error>
-                    where
-                        #lifetime: #scope
-                {
+                async fn poll_from_payload<#mw: AsyncMiddleware<#lifetime>>(ctx: &mut #context, next: &mut #mw) -> Result<Self, Error> {
                     let byte: u8 = next.poll_from_payload(ctx).await?;
 
                     Ok(#name {
@@ -1122,10 +1103,7 @@ fn async_generate_from_payload_impl(name: &Ident, fields: &Fields, lifetime: &Li
     } else {
         quote! {
             impl<#lifetime, #context: Send + Sync> npsd::AsyncFromPayload<#lifetime, #context> for #name {
-                async fn poll_from_payload<#scope, #mw: npsd::AsyncMiddleware>(ctx: &mut #context, next: &#scope mut #mw) -> Result<Self, npsd::Error>
-                    where
-                        #lifetime: #scope
-                {
+                async fn poll_from_payload<#mw: npsd::AsyncMiddleware<#lifetime>>(ctx: &mut #context, next: &mut #mw) -> Result<Self, npsd::Error> {
                     let byte: u8 = next.poll_from_payload(ctx).await?;
 
                     Ok(#name {
@@ -1138,14 +1116,14 @@ fn async_generate_from_payload_impl(name: &Ident, fields: &Fields, lifetime: &Li
 }
 
 #[doc(hidden)]
-fn async_generate_payload_impl(name: &Ident, context: &Ident, internal: bool) -> proc_macro2::TokenStream {
+fn async_generate_payload_impl(name: &Ident, lifetime: &Lifetime, context: &Ident, internal: bool) -> proc_macro2::TokenStream {
     if internal {
         quote! {
-            impl<#context: Send + Sync> AsyncPayload<#context> for #name {}
+            impl<#lifetime, #context: Send + Sync> AsyncPayload<#lifetime, #context> for #name {}
         }
     } else {
         quote! {
-            impl<#context: Send + Sync> npsd::AsyncPayload<#context> for #name {}
+            impl<#lifetime, #context: Send + Sync> npsd::AsyncPayload<#lifetime, #context> for #name {}
         }
     }
 }

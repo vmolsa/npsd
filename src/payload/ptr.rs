@@ -1,7 +1,7 @@
 use super::{Error, Middleware, Payload, IntoPayload, FromPayload};
 
 impl<C, T: IntoPayload<C>> IntoPayload<C> for *mut T {
-    fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
+    fn into_payload<'m, M: Middleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
         unsafe {
             if self.is_null() {
                 return Err(Error::NullPtr);
@@ -13,9 +13,7 @@ impl<C, T: IntoPayload<C>> IntoPayload<C> for *mut T {
 }
 
 impl<'a, C, T: FromPayload<'a, C>> FromPayload<'a, C> for *mut T {
-    fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where 'a: 'b,
-    {
+    fn from_payload<M: Middleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         let value = next.from_payload::<C, T>(ctx)?;
         let boxed = Box::new(value);
         
@@ -23,4 +21,4 @@ impl<'a, C, T: FromPayload<'a, C>> FromPayload<'a, C> for *mut T {
     }
 }
 
-impl<C, T: Payload<C>> Payload<C> for *mut T {}
+impl<'a, C, T: Payload<'a, C>> Payload<'a, C> for *mut T {}

@@ -16,9 +16,9 @@ impl PayloadInfo for Uuid {
 }
 
 #[cfg(feature = "sync")]
-impl<C> IntoPayload<C> for Uuid {
+impl<C> IntoPayload<C>  for Uuid {
     #[inline]
-    fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), PayloadError> {
+    fn into_payload<'m, M: Middleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), PayloadError> {
         next.into_payload(&self.as_u128(), ctx)
     }
 }
@@ -26,24 +26,21 @@ impl<C> IntoPayload<C> for Uuid {
 #[cfg(feature = "sync")]
 impl<'a, C> FromPayload<'a, C> for Uuid {
     #[inline]
-    fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, PayloadError>
-        where
-            'a: 'b,
-    {
+    fn from_payload<M: Middleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, PayloadError> {
         Ok(Uuid::from_u128(next.from_payload(ctx)?))
     }
 }
 
 #[cfg(feature = "sync")]
-impl<C> Payload<C> for Uuid {}
+impl<'a, C> Payload<'a, C> for Uuid {}
 
 #[cfg(feature = "async")]
-impl<C: Send + Sync> AsyncPayload<C> for Uuid {}
+impl<'a, C: Send + Sync> AsyncPayload<'a, C> for Uuid {}
 
 #[cfg(feature = "async")]
 impl<C: Send + Sync> AsyncIntoPayload<C> for Uuid {
     #[inline]
-    async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), PayloadError> {
+    async fn poll_into_payload<'m, M: AsyncMiddleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), PayloadError> {
         next.poll_into_payload(&self.as_u128(), ctx).await
     }
 }
@@ -51,10 +48,7 @@ impl<C: Send + Sync> AsyncIntoPayload<C> for Uuid {
 #[cfg(feature = "async")]
 impl<'a, C: Send + Sync> AsyncFromPayload<'a, C> for Uuid {
     #[inline]
-    async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, PayloadError>
-        where
-            'a: 'b,
-    {
+    async fn poll_from_payload<M: AsyncMiddleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, PayloadError> {
         Ok(Uuid::from_u128(next.poll_from_payload(ctx).await?))
     }
 }

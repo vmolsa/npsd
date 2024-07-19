@@ -1,11 +1,13 @@
 use std::{borrow::Cow, collections::{BTreeMap, BTreeSet, BinaryHeap, LinkedList, VecDeque}, mem};
 use std::{collections::{HashMap, HashSet}, hash::Hash};
 
+use crate::AnyBox;
+
 use super::{Error, Middleware, Payload, IntoPayload, FromPayload};
 
-impl<C, T: IntoPayload<C>> IntoPayload<C> for VecDeque<T> {
+impl<'a, C, T: IntoPayload<C>> IntoPayload<C> for VecDeque<T> {
     #[inline]
-    fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
+    fn into_payload<'m, M: Middleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
         next.into_payload(&self.len(), ctx)?;
 
         for item in self {
@@ -18,9 +20,7 @@ impl<C, T: IntoPayload<C>> IntoPayload<C> for VecDeque<T> {
 
 impl<'a, C, T: FromPayload<'a, C>> FromPayload<'a, C> for VecDeque<T> {
     #[inline]
-    fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &mut M) -> Result<Self, Error>
-        where 'a: 'b,
-    {
+    fn from_payload<M: Middleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         let mut deque = VecDeque::new();
         let count: usize = next.from_payload(ctx)?;
 
@@ -32,10 +32,10 @@ impl<'a, C, T: FromPayload<'a, C>> FromPayload<'a, C> for VecDeque<T> {
     }
 }
 
-impl<C, T: Payload<C>> Payload<C> for VecDeque<T> {}
+impl<'a, C, T: Payload<'a, C>> Payload<'a, C> for VecDeque<T> {}
 
-impl<C, T: IntoPayload<C>> IntoPayload<C> for LinkedList<T> {
-    fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>{
+impl<'a, C, T: IntoPayload<C>> IntoPayload<C> for LinkedList<T> {
+    fn into_payload<'m, M: Middleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>{
         next.into_payload(&self.len(), ctx)?;
 
         for item in self {
@@ -47,9 +47,7 @@ impl<C, T: IntoPayload<C>> IntoPayload<C> for LinkedList<T> {
 }
 
 impl<'a, C, T: FromPayload<'a, C>> FromPayload<'a, C> for LinkedList<T> {
-    fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where 'a: 'b,
-    {
+    fn from_payload<M: Middleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         let mut list = LinkedList::new();
         let count: usize = next.from_payload(ctx)?;
 
@@ -61,10 +59,10 @@ impl<'a, C, T: FromPayload<'a, C>> FromPayload<'a, C> for LinkedList<T> {
     }
 }
 
-impl<'a, C, T: Payload<C>> Payload<C> for LinkedList<T> {}
+impl<'a, C, T: Payload<'a, C>> Payload<'a, C> for LinkedList<T> {}
 
-impl<C, K: IntoPayload<C>, V: IntoPayload<C>> IntoPayload<C> for HashMap<K, V> {
-    fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>{
+impl<'a, C, K: IntoPayload<C>, V: IntoPayload<C>> IntoPayload<C> for HashMap<K, V> {
+    fn into_payload<'m, M: Middleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>{
         next.into_payload(&self.len(), ctx)?;
 
         for (key, value) in self {
@@ -79,9 +77,7 @@ impl<C, K: IntoPayload<C>, V: IntoPayload<C>> IntoPayload<C> for HashMap<K, V> {
 impl<'a, C, K: FromPayload<'a, C>, V: FromPayload<'a, C>> FromPayload<'a, C> for HashMap<K, V> 
     where K: Hash + Eq 
 {
-    fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where 'a: 'b,
-    {
+    fn from_payload<M: Middleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         let mut map = HashMap::new();
         let count: usize = next.from_payload(ctx)?;
 
@@ -96,11 +92,11 @@ impl<'a, C, K: FromPayload<'a, C>, V: FromPayload<'a, C>> FromPayload<'a, C> for
     }
 }
 
-impl<'a, C, K: Payload<C>, V: Payload<C>> Payload<C> for HashMap<K, V> 
+impl<'a, C, K: Payload<'a, C>, V: Payload<'a, C>> Payload<'a, C> for HashMap<K, V> 
     where K: Hash + Eq {}
 
 impl<'a, C, K: IntoPayload<C>, V: IntoPayload<C>> IntoPayload<C> for BTreeMap<K, V> {
-    fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>{
+    fn into_payload<'m, M: Middleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>{
         next.into_payload(&self.len(), ctx)?;
 
         for (key, value) in self {
@@ -115,9 +111,7 @@ impl<'a, C, K: IntoPayload<C>, V: IntoPayload<C>> IntoPayload<C> for BTreeMap<K,
 impl<'a, C, K: FromPayload<'a, C> + Ord, V: FromPayload<'a, C>> FromPayload<'a, C> for BTreeMap<K, V> 
     where K: Hash + Eq 
 {
-    fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where 'a: 'b,
-    {
+    fn from_payload<M: Middleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         let mut map = BTreeMap::new();
         let count: usize = next.from_payload(ctx)?;
 
@@ -132,11 +126,11 @@ impl<'a, C, K: FromPayload<'a, C> + Ord, V: FromPayload<'a, C>> FromPayload<'a, 
     }
 }
 
-impl<C, K: Payload<C>, V: Payload<C>> Payload<C> for BTreeMap<K, V> 
+impl<'a, C, K: Payload<'a, C>, V: Payload<'a, C>> Payload<'a, C> for BTreeMap<K, V> 
     where K: Hash + Eq + Ord {}
 
 impl<'a, C, K: IntoPayload<C>> IntoPayload<C> for HashSet<K> {
-    fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>{
+    fn into_payload<'m, M: Middleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>{
         next.into_payload(&self.len(), ctx)?;
 
         for key in self {
@@ -150,9 +144,7 @@ impl<'a, C, K: IntoPayload<C>> IntoPayload<C> for HashSet<K> {
 impl<'a, C, K: FromPayload<'a, C>> FromPayload<'a, C> for HashSet<K> 
     where K: Hash + Eq 
 {    
-    fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where 'a: 'b,
-    {
+    fn from_payload<M: Middleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         let mut set = HashSet::new();
         let count: usize = next.from_payload(ctx)?;
 
@@ -166,11 +158,11 @@ impl<'a, C, K: FromPayload<'a, C>> FromPayload<'a, C> for HashSet<K>
     }
 }
 
-impl<C, K: Payload<C>> Payload<C> for HashSet<K> 
+impl<'a, C, K: Payload<'a, C>> Payload<'a, C> for HashSet<K> 
     where K: Hash + Eq {}
 
 impl<'a, C, K: IntoPayload<C>> IntoPayload<C> for BTreeSet<K> {
-    fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>{
+    fn into_payload<'m, M: Middleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>{
         next.into_payload(&self.len(), ctx)?;
 
         for key in self {
@@ -184,9 +176,7 @@ impl<'a, C, K: IntoPayload<C>> IntoPayload<C> for BTreeSet<K> {
 impl<'a, C, K: FromPayload<'a, C>> FromPayload<'a, C> for BTreeSet<K> 
     where K: Hash + Eq + Ord
 {    
-    fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where 'a: 'b,
-    {
+    fn from_payload<M: Middleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         let mut set = BTreeSet::new();
         let count: usize = next.from_payload(ctx)?;
 
@@ -200,12 +190,11 @@ impl<'a, C, K: FromPayload<'a, C>> FromPayload<'a, C> for BTreeSet<K>
     }
 }
 
-impl<C, K: Payload<C>> Payload<C> for BTreeSet<K> 
+impl<'a, C, K: Payload<'a, C>> Payload<'a, C> for BTreeSet<K> 
     where K: Hash + Eq + Ord {}
 
-
 impl<'a, C, T: IntoPayload<C> + Ord> IntoPayload<C> for BinaryHeap<T> {
-    fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
+    fn into_payload<'m, M: Middleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
         next.into_payload(&self.len(), ctx)?;
 
         for item in self {
@@ -217,9 +206,7 @@ impl<'a, C, T: IntoPayload<C> + Ord> IntoPayload<C> for BinaryHeap<T> {
 }
 
 impl<'a, C, T: FromPayload<'a, C> + Ord> FromPayload<'a, C> for BinaryHeap<T> {
-    fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where 'a: 'b,
-    {
+    fn from_payload<M: Middleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         let mut heap = BinaryHeap::new();
         let count: usize = next.from_payload(ctx)?;
 
@@ -231,11 +218,11 @@ impl<'a, C, T: FromPayload<'a, C> + Ord> FromPayload<'a, C> for BinaryHeap<T> {
     }
 }
 
-impl<C, T: Payload<C> + Ord> Payload<C> for BinaryHeap<T> {}
+impl<'a, C, T: Payload<'a, C> + Ord> Payload<'a, C> for BinaryHeap<T> {}
 
 impl<'a, C, T: IntoPayload<C>> IntoPayload<C> for Vec<T> {
     #[inline]
-    fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>{
+    fn into_payload<'m, M: Middleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>{
         next.into_payload(&self.as_slice(), ctx)
     }
 }
@@ -244,20 +231,18 @@ impl<'a, C, T: FromPayload<'a, C>> FromPayload<'a, C> for Vec<T>
     where T: Clone + 'a 
 {
     #[inline]
-    fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where 'a: 'b,
-    {
+    fn from_payload<M: Middleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         Ok(Vec::from(next.from_payload::<C, Cow<'a, [T]>>(ctx)?.into_owned()))
     }
 }
 
-impl<C, T: Payload<C>> Payload<C> for Vec<T> 
+impl<'a, C, T: Payload<'a, C> + AnyBox<'a>> Payload<'a, C> for Vec<T> 
     where T: Clone {}
 
 impl<'a, C, T: IntoPayload<C>> IntoPayload<C> for Cow<'a, [T]> 
     where T: Clone 
 {
-    fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>{
+    fn into_payload<'m, M: Middleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>{
         if mem::size_of::<T>() == 1 {
             match self {
                 Cow::Borrowed(slice) => {
@@ -295,9 +280,7 @@ impl<'a, C, T: IntoPayload<C>> IntoPayload<C> for Cow<'a, [T]>
 impl<'a, C, T: FromPayload<'a, C>> FromPayload<'a, C> for Cow<'a, [T]> 
     where T: Clone 
 {
-    fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where 'a: 'b,
-    {
+    fn from_payload<M: Middleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         let len: usize = next.from_payload(ctx)?;
 
         if mem::size_of::<T>() == 1 {
@@ -314,5 +297,5 @@ impl<'a, C, T: FromPayload<'a, C>> FromPayload<'a, C> for Cow<'a, [T]>
     }
 }
 
-impl<'a, C, T: Payload<C>> Payload<C> for Cow<'a, [T]> 
+impl<'a, C, T: Payload<'a, C>> Payload<'a, C> for Cow<'a, [T]> 
     where T: Clone {}

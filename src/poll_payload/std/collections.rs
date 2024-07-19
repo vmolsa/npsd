@@ -5,7 +5,7 @@ use super::{Error, AsyncMiddleware, AsyncPayload, AsyncIntoPayload, AsyncFromPay
 
 impl<C: Send + Sync, T: AsyncIntoPayload<C>> AsyncIntoPayload<C> for VecDeque<T> {
     #[inline]
-    async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error> {
+    async fn poll_into_payload<'m, M: AsyncMiddleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
         next.poll_into_payload(&self.len(), ctx).await?;
 
         for item in self {
@@ -18,9 +18,7 @@ impl<C: Send + Sync, T: AsyncIntoPayload<C>> AsyncIntoPayload<C> for VecDeque<T>
 
 impl<'a, C: Send + Sync, T: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for VecDeque<T> {
     #[inline]
-    async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where 'a: 'b,
-    {
+    async fn poll_from_payload<M: AsyncMiddleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         let mut deque = VecDeque::new();
         let count: usize = next.poll_from_payload(ctx).await?;
 
@@ -32,10 +30,10 @@ impl<'a, C: Send + Sync, T: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for
     }
 }
 
-impl<C: Send + Sync, T: AsyncPayload<C>> AsyncPayload<C> for VecDeque<T> {}
+impl<'a, C: Send + Sync, T: AsyncPayload<'a, C>> AsyncPayload<'a, C> for VecDeque<T> {}
 
 impl<C: Send + Sync, T: AsyncIntoPayload<C>> AsyncIntoPayload<C> for LinkedList<T> {
-    async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error>{
+    async fn poll_into_payload<'m, M: AsyncMiddleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>{
         next.poll_into_payload(&self.len(), ctx).await?;
 
         for item in self {
@@ -47,9 +45,7 @@ impl<C: Send + Sync, T: AsyncIntoPayload<C>> AsyncIntoPayload<C> for LinkedList<
 }
 
 impl<'a, C: Send + Sync, T: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for LinkedList<T> {
-    async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where 'a: 'b,
-    {
+    async fn poll_from_payload<M: AsyncMiddleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         let mut list = LinkedList::new();
         let count: usize = next.poll_from_payload(ctx).await?;
 
@@ -61,10 +57,10 @@ impl<'a, C: Send + Sync, T: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for
     }
 }
 
-impl<C: Send + Sync, T: AsyncPayload<C>> AsyncPayload<C> for LinkedList<T> {}
+impl<'a, C: Send + Sync, T: AsyncPayload<'a, C>> AsyncPayload<'a, C> for LinkedList<T> {}
 
 impl<C: Send + Sync, K: AsyncIntoPayload<C>, V: AsyncIntoPayload<C>> AsyncIntoPayload<C> for HashMap<K, V> {
-    async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error>{
+    async fn poll_into_payload<'m, M: AsyncMiddleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>{
         next.poll_into_payload(&self.len(), ctx).await?;
 
         for (key, value) in self {
@@ -79,9 +75,7 @@ impl<C: Send + Sync, K: AsyncIntoPayload<C>, V: AsyncIntoPayload<C>> AsyncIntoPa
 impl<'a, C: Send + Sync, K: AsyncFromPayload<'a, C>, V: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for HashMap<K, V> 
     where K: Hash + Eq 
 {
-    async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where 'a: 'b,
-    {
+    async fn poll_from_payload<M: AsyncMiddleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         let mut map = HashMap::new();
         let count: usize = next.poll_from_payload(ctx).await?;
 
@@ -96,11 +90,11 @@ impl<'a, C: Send + Sync, K: AsyncFromPayload<'a, C>, V: AsyncFromPayload<'a, C>>
     }
 }
 
-impl<C: Send + Sync, K: AsyncPayload<C>, V: AsyncPayload<C>> AsyncPayload<C> for HashMap<K, V> 
+impl<'a, C: Send + Sync, K: AsyncPayload<'a, C>, V: AsyncPayload<'a, C>> AsyncPayload<'a, C> for HashMap<K, V> 
     where K: Hash + Eq {}
 
 impl<C: Send + Sync, K: AsyncIntoPayload<C>, V: AsyncIntoPayload<C>> AsyncIntoPayload<C> for BTreeMap<K, V> {
-    async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error>{
+    async fn poll_into_payload<'m, M: AsyncMiddleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>{
         next.poll_into_payload(&self.len(), ctx).await?;
 
         for (key, value) in self {
@@ -115,9 +109,7 @@ impl<C: Send + Sync, K: AsyncIntoPayload<C>, V: AsyncIntoPayload<C>> AsyncIntoPa
 impl<'a, C: Send + Sync, K: AsyncFromPayload<'a, C> + Ord, V: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for BTreeMap<K, V> 
     where K: Hash + Eq 
 {
-    async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where 'a: 'b,
-    {
+    async fn poll_from_payload<M: AsyncMiddleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         let mut map = BTreeMap::new();
         let count: usize = next.poll_from_payload(ctx).await?;
 
@@ -132,11 +124,11 @@ impl<'a, C: Send + Sync, K: AsyncFromPayload<'a, C> + Ord, V: AsyncFromPayload<'
     }
 }
 
-impl<C: Send + Sync, K: AsyncPayload<C>, V: AsyncPayload<C>> AsyncPayload<C> for BTreeMap<K, V> 
+impl<'a, C: Send + Sync, K: AsyncPayload<'a, C>, V: AsyncPayload<'a, C>> AsyncPayload<'a, C> for BTreeMap<K, V> 
     where K: Hash + Eq + Ord {}
 
 impl<C: Send + Sync, K: AsyncIntoPayload<C>> AsyncIntoPayload<C> for HashSet<K> {
-    async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error>{
+    async fn poll_into_payload<'m, M: AsyncMiddleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>{
         next.poll_into_payload(&self.len(), ctx).await?;
 
         for key in self {
@@ -150,9 +142,7 @@ impl<C: Send + Sync, K: AsyncIntoPayload<C>> AsyncIntoPayload<C> for HashSet<K> 
 impl<'a, C: Send + Sync, K: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for HashSet<K> 
     where K: Hash + Eq 
 {    
-    async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where 'a: 'b,
-    {
+    async fn poll_from_payload<M: AsyncMiddleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         let mut set = HashSet::new();
         let count: usize = next.poll_from_payload(ctx).await?;
 
@@ -166,11 +156,11 @@ impl<'a, C: Send + Sync, K: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for
     }
 }
 
-impl<C: Send + Sync, K: AsyncPayload<C>> AsyncPayload<C> for HashSet<K> 
+impl<'a, C: Send + Sync, K: AsyncPayload<'a, C>> AsyncPayload<'a, C> for HashSet<K> 
     where K: Hash + Eq {}
 
 impl<C: Send + Sync, K: AsyncIntoPayload<C>> AsyncIntoPayload<C> for BTreeSet<K> {
-    async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error>{
+    async fn poll_into_payload<'m, M: AsyncMiddleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>{
         next.poll_into_payload(&self.len(), ctx).await?;
 
         for key in self {
@@ -184,9 +174,7 @@ impl<C: Send + Sync, K: AsyncIntoPayload<C>> AsyncIntoPayload<C> for BTreeSet<K>
 impl<'a, C: Send + Sync, K: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for BTreeSet<K> 
     where K: Hash + Eq + Ord
 {    
-    async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where 'a: 'b,
-    {
+    async fn poll_from_payload<M: AsyncMiddleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         let mut set = BTreeSet::new();
         let count: usize = next.poll_from_payload(ctx).await?;
 
@@ -200,11 +188,11 @@ impl<'a, C: Send + Sync, K: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for
     }
 }
 
-impl<C: Send + Sync, K: AsyncPayload<C>> AsyncPayload<C> for BTreeSet<K> 
+impl<'a, C: Send + Sync, K: AsyncPayload<'a, C>> AsyncPayload<'a, C> for BTreeSet<K> 
     where K: Hash + Eq + Ord {}
 
 impl<C: Send + Sync, T: AsyncIntoPayload<C> + Ord> AsyncIntoPayload<C> for BinaryHeap<T> {
-    async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error> {
+    async fn poll_into_payload<'m, M: AsyncMiddleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
         next.poll_into_payload(&self.len(), ctx).await?;
 
         for item in self {
@@ -216,9 +204,7 @@ impl<C: Send + Sync, T: AsyncIntoPayload<C> + Ord> AsyncIntoPayload<C> for Binar
 }
 
 impl<'a, C: Send + Sync, T: AsyncFromPayload<'a, C> + Ord> AsyncFromPayload<'a, C> for BinaryHeap<T> {
-    async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where 'a: 'b,
-    {
+    async fn poll_from_payload<M: AsyncMiddleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         let mut heap = BinaryHeap::new();
         let count: usize = next.poll_from_payload(ctx).await?;
 
@@ -230,11 +216,11 @@ impl<'a, C: Send + Sync, T: AsyncFromPayload<'a, C> + Ord> AsyncFromPayload<'a, 
     }
 }
 
-impl<C: Send + Sync, T: AsyncPayload<C> + Ord> AsyncPayload<C> for BinaryHeap<T> {}
+impl<'a, C: Send + Sync, T: AsyncPayload<'a, C> + Ord> AsyncPayload<'a, C> for BinaryHeap<T> {}
 
 impl<C: Send + Sync, T: AsyncIntoPayload<C>> AsyncIntoPayload<C> for Vec<T> {
     #[inline]
-    async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error>{
+    async fn poll_into_payload<'m, M: AsyncMiddleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error>{
         next.poll_into_payload(&self.as_slice(), ctx).await
     }
 }
@@ -243,20 +229,18 @@ impl<'a, C: Send + Sync, T: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for
     where T: Clone + 'a 
 {
     #[inline]
-    async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where 'a: 'b,
-    {
+    async fn poll_from_payload<M: AsyncMiddleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         Ok(Vec::from(next.poll_from_payload::<C, Cow<'a, [T]>>(ctx).await?.into_owned()))
     }
 }
 
-impl<C: Send + Sync, T: AsyncPayload<C>> AsyncPayload<C> for Vec<T> 
+impl<'a, C: Send + Sync, T: AsyncPayload<'a, C>> AsyncPayload<'a, C> for Vec<T> 
     where T: Clone {}
 
 impl<'a, C: Send + Sync, T: AsyncIntoPayload<C>> AsyncIntoPayload<C> for Cow<'a, [T]> 
     where T: Clone 
 {
-    async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error> {
+    async fn poll_into_payload<'m, M: AsyncMiddleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
         if mem::size_of::<T>() == 1 {
             match self {
                 Cow::Borrowed(slice) => {
@@ -294,9 +278,7 @@ impl<'a, C: Send + Sync, T: AsyncIntoPayload<C>> AsyncIntoPayload<C> for Cow<'a,
 impl<'a, C: Send + Sync, T: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for Cow<'a, [T]> 
     where T: Clone 
 {
-    async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where 'a: 'b,
-    {
+    async fn poll_from_payload<M: AsyncMiddleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         let len: usize = next.poll_from_payload(ctx).await?;
 
         if mem::size_of::<T>() == 1 {
@@ -313,5 +295,5 @@ impl<'a, C: Send + Sync, T: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for
     }
 }
 
-impl<'a, C: Send + Sync, T: AsyncPayload<C>> AsyncPayload<C> for Cow<'a, [T]> 
+impl<'a, C: Send + Sync, T: AsyncPayload<'a, C>> AsyncPayload<'a, C> for Cow<'a, [T]> 
     where T: Clone {}

@@ -31,10 +31,16 @@ pub enum Error {
         found: usize,
     },
 
+    #[error("Stack error: `{0}`")]
+    Stack(String),
+
+    #[error("Unknown error: `{0}`")]
+    Unknown(String),
+
     #[error("Invalid UTF-8 sequence")]
     InvalidUtf8(String),
 
-    #[error("Unknown variant `{0}`")]
+    #[error("Unknown variant: `{0}`")]
     UnknownVariant(String),
 
     #[error("Index out of bounds: `{0}`")]

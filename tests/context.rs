@@ -17,7 +17,7 @@ struct CheckContext {
 
 #[cfg(feature = "sync")]
 impl IntoPayload<usize> for ContextUnwrap {
-    fn into_payload<M: Middleware>(&self, ctx: &mut usize, next: &mut M) -> Result<(), Error> {
+    fn into_payload<'a, M: Middleware<'a>>(&self, ctx: &mut usize, next: &mut M) -> Result<(), Error> {
         match self {
             ContextUnwrap::Void => next.into_payload(&0u8, ctx),
             ContextUnwrap::Usize(value) => {
@@ -30,10 +30,7 @@ impl IntoPayload<usize> for ContextUnwrap {
 
 #[cfg(feature = "sync")]
 impl<'a> FromPayload<'a, usize> for ContextUnwrap {
-    fn from_payload<'b, M: Middleware>(ctx: &mut usize, next: &'b mut M) -> Result<Self, Error>
-        where
-            'a: 'b
-    {
+    fn from_payload<M: Middleware<'a>>(ctx: &mut usize, next: &mut M) -> Result<Self, Error> {
         match next.from_payload::<usize, u8>(ctx)? {
             0 => {
                 Ok(ContextUnwrap::Void)
@@ -49,7 +46,7 @@ impl<'a> FromPayload<'a, usize> for ContextUnwrap {
 }
 
 #[cfg(feature = "sync")]
-impl<'a> Payload<usize> for ContextUnwrap {}
+impl<'a> Payload<'a, usize> for ContextUnwrap {}
 
 #[cfg(feature = "sync")]
 impl PayloadInfo for ContextUnwrap {
@@ -58,7 +55,7 @@ impl PayloadInfo for ContextUnwrap {
 
 #[cfg(feature = "sync")]
 impl IntoPayload<usize> for CheckContext {
-    fn into_payload<M: Middleware>(&self, ctx: &mut usize, next: &mut M) -> Result<(), Error> {
+    fn into_payload<'a, M: Middleware<'a>>(&self, ctx: &mut usize, next: &mut M) -> Result<(), Error> {
         let mut this = self.clone();
 
         this.sender = Some(ContextUnwrap::Usize(*ctx));
@@ -70,10 +67,7 @@ impl IntoPayload<usize> for CheckContext {
 
 #[cfg(feature = "sync")]
 impl<'a> FromPayload<'a, usize> for CheckContext {
-    fn from_payload<'b, M: Middleware>(ctx: &mut usize, next: &'b mut M) -> Result<Self, Error>
-        where
-            'a: 'b
-    {
+    fn from_payload<M: Middleware<'a>>(ctx: &mut usize, next: &mut M) -> Result<Self, Error> {
         Ok(CheckContext {
             sender: next.from_payload(ctx)?,
             receiver: Some(ContextUnwrap::Usize(*ctx))
@@ -82,7 +76,7 @@ impl<'a> FromPayload<'a, usize> for CheckContext {
 }
 
 #[cfg(feature = "sync")]
-impl<'a> Payload<usize> for CheckContext {}
+impl<'a> Payload<'a, usize> for CheckContext {}
 
 #[cfg(feature = "sync")]
 impl PayloadInfo for CheckContext {

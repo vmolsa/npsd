@@ -27,7 +27,7 @@ use super::{Error, AsyncMiddleware, AsyncPayload, AsyncIntoPayload, AsyncFromPay
 /// ```
 
 impl<C: Send + Sync> AsyncIntoPayload<C> for io::Error {
-    async fn poll_into_payload<M: AsyncMiddleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
+    async fn poll_into_payload<'b, M: AsyncMiddleware<'b>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
         let kind: u8 = match self.kind() {
             ErrorKind::NotFound => 0,
             ErrorKind::PermissionDenied => 1,
@@ -100,9 +100,7 @@ impl<C: Send + Sync> AsyncIntoPayload<C> for io::Error {
 }
 
 impl<'a, C: Send + Sync> AsyncFromPayload<'a, C> for io::Error {
-    async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where 'a: 'b,
-    {
+    async fn poll_from_payload<M: AsyncMiddleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         let byte: u8 = next.poll_from_payload(ctx).await?;
         let msg: String = next.poll_from_payload(ctx).await?;
 
@@ -176,4 +174,4 @@ impl<'a, C: Send + Sync> AsyncFromPayload<'a, C> for io::Error {
     }
 }
 
-impl<C: Send + Sync> AsyncPayload<C> for io::Error {}
+impl<'a, C: Send + Sync> AsyncPayload<'a, C> for io::Error {}

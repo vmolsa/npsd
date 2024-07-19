@@ -1,7 +1,7 @@
 use super::{Error, FromPayload, IntoPayload, Middleware, Payload};
 
-impl<C, T: IntoPayload<C>> IntoPayload<C> for Option<T> {
-    fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
+impl<'a, C, T: IntoPayload<C>> IntoPayload<C> for Option<T> {
+    fn into_payload<'b, M: Middleware<'b>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
         if let Some(data) = self {
             next.into_payload(&1u8, ctx)?;
             next.into_payload(data, ctx)
@@ -12,9 +12,7 @@ impl<C, T: IntoPayload<C>> IntoPayload<C> for Option<T> {
 }
 
 impl<'a, C, T: FromPayload<'a, C>> FromPayload<'a, C> for Option<T> {
-    fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where 'a: 'b
-    {
+    fn from_payload<M: Middleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         let byte: u8 = next.from_payload(ctx)?;
 
         if byte != 0 {
@@ -27,10 +25,10 @@ impl<'a, C, T: FromPayload<'a, C>> FromPayload<'a, C> for Option<T> {
     }
 }
 
-impl<C, T: Payload<C>> Payload<C> for Option<T> {}
+impl<'a, C, T: Payload<'a, C>> Payload<'a, C> for Option<T> {}
 
-impl<C, T: IntoPayload<C>, E: IntoPayload<C>> IntoPayload<C> for Result<T, E> {
-    fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
+impl<'a, C, T: IntoPayload<C>, E: IntoPayload<C>> IntoPayload<C> for Result<T, E> {
+    fn into_payload<'b, M: Middleware<'b>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
         match self {
             Ok(res) => {
                 next.into_payload(&1u8, ctx)?;
@@ -45,9 +43,7 @@ impl<C, T: IntoPayload<C>, E: IntoPayload<C>> IntoPayload<C> for Result<T, E> {
 }
 
 impl<'a, C, T: FromPayload<'a, C>, E: FromPayload<'a, C>> FromPayload<'a, C> for Result<T, E> {
-    fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where 'a: 'b
-    {
+    fn from_payload<M: Middleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         let byte: u8 = next.from_payload(ctx)?;
 
         if byte != 0 {
@@ -62,4 +58,4 @@ impl<'a, C, T: FromPayload<'a, C>, E: FromPayload<'a, C>> FromPayload<'a, C> for
     }
 }
 
-impl<C, T: Payload<C>, E: Payload<C>> Payload<C> for Result<T, E> {}
+impl<'a, C, T: Payload<'a, C>, E: Payload<'a, C>> Payload<'a, C> for Result<T, E> {}

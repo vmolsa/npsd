@@ -15,16 +15,16 @@ use crate::{Error, PayloadInfo};
 //     const SIZE: Option<usize> = Some(core::mem::size_of::<NaiveDate>());
 // }
 
-// impl<C> IntoPayload<C> for NaiveDate {
+// impl<C> IntoPayload<C>  for NaiveDate {
 //     #[inline]
-//     fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
+//     fn into_payload<'m, M: Middleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
 //         next.into_payload(&self.to_string(), ctx)
 //     }
 // }
 
 // impl<'a, C> FromPayload<'a, C> for NaiveDate {
 //     #[inline]
-//     fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
+//     fn from_payload<M: Middleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error>
 //         where
 //             'a: 'b,
 //     {
@@ -32,23 +32,23 @@ use crate::{Error, PayloadInfo};
 //     }
 // }
 
-// impl<'a, C> Payload<C> for NaiveDate {}
+// impl<'a, C> Payload<'a, C> for NaiveDate {}
 
 // impl PayloadInfo for NaiveTime {
 //     const TYPE: &'static str = "NaiveTime";
 //     const SIZE: Option<usize> = Some(core::mem::size_of::<NaiveTime>());
 // }
 
-// impl<C> IntoPayload<C> for NaiveTime {
+// impl<C> IntoPayload<C>  for NaiveTime {
 //     #[inline]
-//     fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
+//     fn into_payload<'m, M: Middleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
 //         next.into_payload(&self.to_string(), ctx)
 //     }
 // }
 
 // impl<'a, C> FromPayload<'a, C> for NaiveTime {
 //     #[inline]
-//     fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
+//     fn from_payload<M: Middleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error>
 //         where
 //             'a: 'b,
 //     {
@@ -56,23 +56,23 @@ use crate::{Error, PayloadInfo};
 //     }
 // }
 
-// impl<'a, C> Payload<C> for NaiveTime {}
+// impl<'a, C> Payload<'a, C> for NaiveTime {}
 
 // impl PayloadInfo for NaiveDateTime {
 //     const TYPE: &'static str = "NaiveDateTime";
 //     const SIZE: Option<usize> = Some(core::mem::size_of::<NaiveDateTime>());
 // }
 
-// impl<C> IntoPayload<C> for NaiveDateTime {
+// impl<C> IntoPayload<C>  for NaiveDateTime {
 //     #[inline]
-//     fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
+//     fn into_payload<'m, M: Middleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
 //         next.into_payload(&self.to_string(), ctx)
 //     }
 // }
 
 // impl<'a, C> FromPayload<'a, C> for NaiveDateTime {
 //     #[inline]
-//     fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
+//     fn from_payload<M: Middleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error>
 //         where
 //             'a: 'b,
 //     {
@@ -80,7 +80,7 @@ use crate::{Error, PayloadInfo};
 //     }
 // }
 
-// impl<'a, C> Payload<C> for NaiveDateTime {}
+// impl<'a, C> Payload<'a, C> for NaiveDateTime {}
 
 impl PayloadInfo for DateTime<Utc> {
     const TYPE: &'static str = "DateTime<Utc>";
@@ -88,9 +88,9 @@ impl PayloadInfo for DateTime<Utc> {
 }
 
 #[cfg(feature = "sync")]
-impl<C> IntoPayload<C> for DateTime<Utc> {
+impl<C> IntoPayload<C>  for DateTime<Utc> {
     #[inline]
-    fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
+    fn into_payload<'m, M: Middleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
         next.into_payload(&self.to_rfc3339(), ctx)
     }
 }
@@ -98,10 +98,7 @@ impl<C> IntoPayload<C> for DateTime<Utc> {
 #[cfg(feature = "sync")]
 impl<'a, C> FromPayload<'a, C> for DateTime<Utc> {
     #[inline]
-    fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where
-            'a: 'b,
-    {
+    fn from_payload<M: Middleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         DateTime::parse_from_rfc3339(next.from_payload(ctx)?)
             .map_err(|e| Error::Time(e.to_string()))
             .map(|dt| dt.with_timezone(&Utc))
@@ -109,12 +106,12 @@ impl<'a, C> FromPayload<'a, C> for DateTime<Utc> {
 }
 
 #[cfg(feature = "sync")]
-impl<'a, C> Payload<C> for DateTime<Utc> {}
+impl<'a, C> Payload<'a, C> for DateTime<Utc> {}
 
 #[cfg(feature = "async")]
 impl<C: Send + Sync> AsyncIntoPayload<C> for DateTime<Utc> {
     #[inline]
-    async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error> {
+    async fn poll_into_payload<'m, M: AsyncMiddleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
         next.poll_into_payload(&self.to_rfc3339(), ctx).await
     }
 }
@@ -122,10 +119,7 @@ impl<C: Send + Sync> AsyncIntoPayload<C> for DateTime<Utc> {
 #[cfg(feature = "async")]
 impl<'a, C: Send + Sync> AsyncFromPayload<'a, C> for DateTime<Utc> {
     #[inline]
-    async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where
-            'a: 'b,
-    {
+    async fn poll_from_payload<M: AsyncMiddleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         DateTime::parse_from_rfc3339(next.poll_from_payload(ctx).await?)
             .map_err(|e| Error::Time(e.to_string()))
             .map(|dt| dt.with_timezone(&Utc))
@@ -133,7 +127,7 @@ impl<'a, C: Send + Sync> AsyncFromPayload<'a, C> for DateTime<Utc> {
 }
 
 #[cfg(feature = "async")]
-impl<C: Send + Sync> AsyncPayload<C> for DateTime<Utc> {}
+impl<'a, C: Send + Sync> AsyncPayload<'a, C> for DateTime<Utc> {}
 
 impl PayloadInfo for DateTime<Local> {
     const TYPE: &'static str = "DateTime<Local>";
@@ -141,9 +135,9 @@ impl PayloadInfo for DateTime<Local> {
 }
 
 #[cfg(feature = "sync")]
-impl<C> IntoPayload<C> for DateTime<Local> {
+impl<C> IntoPayload<C>  for DateTime<Local> {
     #[inline]
-    fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
+    fn into_payload<'m, M: Middleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
         next.into_payload(&self.to_rfc3339(), ctx)
     }
 }
@@ -151,10 +145,7 @@ impl<C> IntoPayload<C> for DateTime<Local> {
 #[cfg(feature = "sync")]
 impl<'a, C> FromPayload<'a, C> for DateTime<Local> {
     #[inline]
-    fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-    where
-        'a: 'b,
-    {
+    fn from_payload<M: Middleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         DateTime::parse_from_rfc3339(next.from_payload(ctx)?)
             .map_err(|e| Error::Time(e.to_string()))
             .map(|dt| dt.with_timezone(&Local))
@@ -162,12 +153,12 @@ impl<'a, C> FromPayload<'a, C> for DateTime<Local> {
 }
 
 #[cfg(feature = "sync")]
-impl<C> Payload<C> for DateTime<Local> {}
+impl<'a, C> Payload<'a, C> for DateTime<Local> {}
 
 #[cfg(feature = "async")]
 impl<C: Send + Sync> AsyncIntoPayload<C> for DateTime<Local> {
     #[inline]
-    async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error> {
+    async fn poll_into_payload<'m, M: AsyncMiddleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
         next.poll_into_payload(&self.to_rfc3339(), ctx).await
     }
 }
@@ -175,17 +166,14 @@ impl<C: Send + Sync> AsyncIntoPayload<C> for DateTime<Local> {
 #[cfg(feature = "async")]
 impl<'a, C: Send + Sync> AsyncFromPayload<'a, C> for DateTime<Local> {
     #[inline]
-    async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where
-            'a: 'b,
-    {
+    async fn poll_from_payload<M: AsyncMiddleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         DateTime::parse_from_rfc3339(next.poll_from_payload(ctx).await?)
             .map_err(|e| Error::Time(e.to_string()))
             .map(|dt| dt.with_timezone(&Local))
     }
 }
 #[cfg(feature = "async")]
-impl<C: Send + Sync> AsyncPayload<C> for DateTime<Local> {}
+impl<'a, C: Send + Sync> AsyncPayload<'a, C> for DateTime<Local> {}
 
 impl PayloadInfo for DateTime<FixedOffset> {
     const TYPE: &'static str = "DateTime<FixedOffset>";
@@ -193,9 +181,9 @@ impl PayloadInfo for DateTime<FixedOffset> {
 }
 
 #[cfg(feature = "sync")]
-impl<C> IntoPayload<C> for DateTime<FixedOffset> {
+impl<C> IntoPayload<C>  for DateTime<FixedOffset> {
     #[inline]
-    fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
+    fn into_payload<'m, M: Middleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
         next.into_payload(&self.to_rfc3339(), ctx)
     }
 }
@@ -203,10 +191,7 @@ impl<C> IntoPayload<C> for DateTime<FixedOffset> {
 #[cfg(feature = "sync")]
 impl<'a, C> FromPayload<'a, C> for DateTime<FixedOffset> {
     #[inline]
-    fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-    where
-        'a: 'b,
-    {
+    fn from_payload<M: Middleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         DateTime::parse_from_rfc3339(next.from_payload(ctx)?)
             .map_err(|e| Error::Time(e.to_string()))
             .map(|dt| dt.with_timezone(dt.offset()))
@@ -214,12 +199,12 @@ impl<'a, C> FromPayload<'a, C> for DateTime<FixedOffset> {
 }
 
 #[cfg(feature = "sync")]
-impl<C> Payload<C> for DateTime<FixedOffset> {}
+impl<'a, C> Payload<'a, C> for DateTime<FixedOffset> {}
 
 #[cfg(feature = "async")]
 impl<C: Send + Sync> AsyncIntoPayload<C> for DateTime<FixedOffset> {
     #[inline]
-    async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error> {
+    async fn poll_into_payload<'m, M: AsyncMiddleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
         next.poll_into_payload(&self.to_rfc3339(), ctx).await
     }
 }
@@ -227,10 +212,7 @@ impl<C: Send + Sync> AsyncIntoPayload<C> for DateTime<FixedOffset> {
 #[cfg(feature = "async")]
 impl<'a, C: Send + Sync> AsyncFromPayload<'a, C> for DateTime<FixedOffset> {
     #[inline]
-    async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where
-            'a: 'b,
-    {
+    async fn poll_from_payload<M: AsyncMiddleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         DateTime::parse_from_rfc3339(next.poll_from_payload(ctx).await?)
             .map_err(|e| Error::Time(e.to_string()))
             .map(|dt| dt.with_timezone(dt.offset()))
@@ -238,4 +220,4 @@ impl<'a, C: Send + Sync> AsyncFromPayload<'a, C> for DateTime<FixedOffset> {
 }
 
 #[cfg(feature = "async")]
-impl<C: Send + Sync> AsyncPayload<C> for DateTime<FixedOffset> {}
+impl<'a, C: Send + Sync> AsyncPayload<'a, C> for DateTime<FixedOffset> {}

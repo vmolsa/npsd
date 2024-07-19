@@ -5,23 +5,25 @@ use super::{Error, Middleware, Payload, IntoPayload, FromPayload};
 #[macro_export]
 macro_rules! payload_be_bytes {
     ($type:ty) => {
-        impl<C> IntoPayload<C> for $type {
+        impl<C> IntoPayload<C>  for $type {
             #[inline]
-            fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
+            fn into_payload<'m, M: Middleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
                 next.into_payload(&self.to_be_bytes(), ctx)
             }
         }
         
         impl<'a, C> FromPayload<'a, C> for $type {
             #[inline]
-            fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-                where 'a: 'b,
-            {
-                Ok(<Self>::from_be_bytes(next.from_payload(ctx)?))
+            fn from_payload<M: Middleware<'a>>(_ctx: &mut C, next: &mut M) -> Result<Self, Error> {
+                let slice: &[u8] = next.read(mem::size_of::<Self>())?;
+
+                Ok(<Self>::from_be_bytes(unsafe {
+                    *(slice.as_ptr() as *const [u8; mem::size_of::<Self>()])
+                }))
             }
         }
 
-        impl<C> Payload<C> for $type {}
+        impl<'a, C> Payload<'a, C> for $type {}
     };
 }
 
@@ -38,26 +40,24 @@ payload_be_bytes!(u128);
 payload_be_bytes!(f32);
 payload_be_bytes!(f64);
 
-impl<C> IntoPayload<C> for isize {
+impl<C> IntoPayload<C>  for isize {
     #[inline]
-    fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
+    fn into_payload<'m, M: Middleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
         next.into_payload(&(*self as i64).to_be_bytes(), ctx)
     }
 }
 
 impl<'a, C> FromPayload<'a, C> for isize {
     #[inline]
-    fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where 'a: 'b,
-    {
+    fn from_payload<M: Middleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         Ok(<i64>::from_be_bytes(next.from_payload(ctx)?) as Self)
     }
 }
 
-impl<C> Payload<C> for isize {}
+impl<'a, C> Payload<'a, C> for isize {}
 
-impl<C> IntoPayload<C> for usize {
-    fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
+impl<C> IntoPayload<C>  for usize {
+    fn into_payload<'m, M: Middleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
         let mut value = *self;
         const CONTINUATION_BIT: u8 = 0b1000_0000;
         const DATA_BITS: usize = 7;
@@ -78,9 +78,7 @@ impl<C> IntoPayload<C> for usize {
 }
 
 impl<'a, C> FromPayload<'a, C> for usize {
-    fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error> 
-        where 'a: 'b,
-    {
+    fn from_payload<M: Middleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         const CONTINUATION_BIT: u8 = 0b1000_0000;
         const DATA_BITS: u8 = 7;
 
@@ -108,26 +106,24 @@ impl<'a, C> FromPayload<'a, C> for usize {
     }
 }
 
-impl<C> Payload<C> for usize {}
+impl<'a, C> Payload<'a, C> for usize {}
 
-impl<C> IntoPayload<C> for () {
-    fn into_payload<M: Middleware>(&self, _ctx: &mut C, _next: &mut M) -> Result<(), Error> {
+impl<C> IntoPayload<C>  for () {
+    fn into_payload<'m, M: Middleware<'m>>(&self, _ctx: &mut C, _next: &mut M) -> Result<(), Error> {
         Ok(())
     }
 }
 
 impl<'a, C> FromPayload<'a, C> for () {
-    fn from_payload<'b, M: Middleware>(_ctx: &mut C, _next: &mut M) -> Result<Self, Error>
-        where 'a: 'b,
-    {
+    fn from_payload<M: Middleware<'a>>(_ctx: &mut C, _next: &mut M) -> Result<Self, Error> {
         Ok(())
     }
 }
 
-impl<C> Payload<C> for () {}
+impl<'a, C> Payload<'a, C> for () {}
 
-impl<C> IntoPayload<C> for bool {
-    fn into_payload<M: Middleware>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
+impl<C> IntoPayload<C>  for bool {
+    fn into_payload<'m, M: Middleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
         if *self {
             next.into_payload(&1u8, ctx)
         } else {
@@ -137,9 +133,7 @@ impl<C> IntoPayload<C> for bool {
 }
 
 impl<'a, C> FromPayload<'a, C> for bool {
-    fn from_payload<'b, M: Middleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where 'a: 'b,
-    {
+    fn from_payload<M: Middleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         let byte: u8 = next.from_payload(ctx)?;
 
         if byte != 0 {
@@ -150,5 +144,5 @@ impl<'a, C> FromPayload<'a, C> for bool {
     }
 }
 
-impl<C> Payload<C> for bool {}
+impl<'a, C> Payload<'a, C> for bool {}
 

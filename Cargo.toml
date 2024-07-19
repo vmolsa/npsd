@@ -3,7 +3,7 @@ members = ["schema"]
 
 [package]
 name = "npsd"
-version = "0.1.11"
+version = "0.2.0"
 edition = "2021"
 license = "Apache-2.0"
 publish = true
@@ -16,18 +16,19 @@ readme = "README.md"
 
 [dependencies]
 thiserror = "1.0.61"
-npsd-schema = { path = "schema", version = "0.1.2" }
+npsd-schema = { path = "schema", version = "0.2.0" }
 xxhash-rust = { version = "0.8.10", features = ["xxh3", "const_xxh3"] }
 uuid = { version = "1.8.0", features = ["std", "v4", "v7"], optional = true }
 fxhash = { version = "0.2.1", optional = true }
 chrono = { version = "0.4.38", optional = true }
+crossbeam = { version = "0.8.4", optional = true }
 
 [features]
-default = [ "sync" ]
+default = [ "crossbeam", "sync" ]
 sync = []
 async = []
 info = []
-full = [ "sync", "async", "info", "uuid", "fxhash", "chrono" ]
+full = [ "crossbeam", "sync", "async", "info", "uuid", "fxhash", "chrono" ]
 
 [dev-dependencies]
 pretty-hex = "0.4.1"

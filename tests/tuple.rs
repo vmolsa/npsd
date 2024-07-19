@@ -2,13 +2,13 @@
 use std::fmt::Debug;
 
 #[cfg(feature = "sync")]
-use npsd::{FromPayload, IntoPayload, Payload};
+use npsd::{Payload};
 
 #[cfg(feature = "sync")]
-fn test_send_recv<T, E>(src: T, dst: E)
+fn test_send_recv<'p, T, E>(src: T, dst: E)
     where
-        T: Payload<()> + IntoPayload<()>,
-        E: Payload<()> + for<'a> FromPayload<'a, ()> + PartialEq + Debug,
+        T: Payload<'p, ()>,
+        E: Payload<'p, ()> + PartialEq + Debug,
 {
     use pretty_hex::PrettyHex;
 

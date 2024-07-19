@@ -1,7 +1,7 @@
 use super::{Error, AsyncFromPayload, AsyncIntoPayload, AsyncMiddleware, AsyncPayload};
 
 impl<C: Send + Sync, T: AsyncIntoPayload<C>> AsyncIntoPayload<C> for Option<T> {
-    async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error> {
+    async fn poll_into_payload<'m, M: AsyncMiddleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
         if let Some(data) = self {
             next.poll_into_payload(&1u8, ctx).await?;
             next.poll_into_payload(data, ctx).await
@@ -12,9 +12,7 @@ impl<C: Send + Sync, T: AsyncIntoPayload<C>> AsyncIntoPayload<C> for Option<T> {
 }
 
 impl<'a, C: Send + Sync, T: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for Option<T> {
-    async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where 'a: 'b
-    {
+    async fn poll_from_payload<M: AsyncMiddleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         let byte: u8 = next.poll_from_payload(ctx).await?;
 
         if byte != 0 {
@@ -27,10 +25,10 @@ impl<'a, C: Send + Sync, T: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for
     }
 }
 
-impl<C: Send + Sync, T: AsyncPayload<C>> AsyncPayload<C> for Option<T> {}
+impl<'a, C: Send + Sync, T: AsyncPayload<'a, C>> AsyncPayload<'a, C> for Option<T> {}
 
 impl<C: Send + Sync, T: AsyncIntoPayload<C>, E: AsyncIntoPayload<C>> AsyncIntoPayload<C> for Result<T, E> {
-    async fn poll_into_payload<'b, M: AsyncMiddleware>(&self, ctx: &mut C, next: &'b mut M) -> Result<(), Error> {
+    async fn poll_into_payload<'m, M: AsyncMiddleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
         match self {
             Ok(res) => {
                 next.poll_into_payload(&1u8, ctx).await?;
@@ -45,9 +43,7 @@ impl<C: Send + Sync, T: AsyncIntoPayload<C>, E: AsyncIntoPayload<C>> AsyncIntoPa
 }
 
 impl<'a, C: Send + Sync, T: AsyncFromPayload<'a, C>, E: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for Result<T, E> {
-    async fn poll_from_payload<'b, M: AsyncMiddleware>(ctx: &mut C, next: &'b mut M) -> Result<Self, Error>
-        where 'a: 'b
-    {
+    async fn poll_from_payload<M: AsyncMiddleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
         let byte: u8 = next.poll_from_payload(ctx).await?;
 
         if byte != 0 {
@@ -62,4 +58,4 @@ impl<'a, C: Send + Sync, T: AsyncFromPayload<'a, C>, E: AsyncFromPayload<'a, C>>
     }
 }
 
-impl<C: Send + Sync, T: AsyncPayload<C>, E: AsyncPayload<C>> AsyncPayload<C> for Result<T, E> {}
+impl<'a, C: Send + Sync, T: AsyncPayload<'a, C>, E: AsyncPayload<'a, C>> AsyncPayload<'a, C> for Result<T, E> {}
