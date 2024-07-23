@@ -315,7 +315,7 @@ impl CowRw for (Cow<'_, [u8]>, usize) {
 ///       into a `Cow` buffer.
 /// - `pub fn serialized(&self) -> Vec<u8>`:
 ///     - Returns a vector containing the serialized data from the underlying buffer.
-/// - `pub fn as_slice(&'a self) -> &'a [u8]`:
+/// - `pub fn as_slice(&self) -> &[u8]`:
 ///     - Returns a slice of the underlying buffer.
 #[derive(Clone, Debug)]
 pub struct Next<'a>{
@@ -348,7 +348,7 @@ impl<'a> Next<'a> {
     }
 
     #[inline(always)]
-    pub fn as_slice(&'a self) -> &'a [u8] { 
+    pub fn as_slice(&self) -> &[u8] { 
         self.buf.0.as_ref()
     }
 }
@@ -427,7 +427,7 @@ impl<'a> NextTrace<'a> {
     }
 
     #[inline(always)]
-    pub fn as_slice(&'a self) -> &'a [u8] { 
+    pub fn as_slice(&self) -> &[u8] { 
         self.buf.0.as_ref()
     }
 }
