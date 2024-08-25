@@ -1,4 +1,5 @@
 use core::mem;
+use std::ops::Range;
 
 use crate::AnyBox;
 
@@ -79,28 +80,41 @@ impl<'a, C, T: IntoPayload<C>, const N: usize> IntoPayload<C> for [T; N] {
     }
 }
 
-impl<'a, C, T: FromPayload<'a, C> + AnyBox<'a> + 'a, const N: usize> FromPayload<'a, C> for [T; N] 
+impl<'a, C, T: FromPayload<'a, C> + Default + 'a, const N: usize> FromPayload<'a, C> for [T; N]
     where T: Copy
 {
     fn from_payload<M: Middleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
+        let mut result = [T::default(); N];
+
         if mem::size_of::<T>() == 1 {
             let bytes: &[T] = next.read(N)?;
-
-            Ok(unsafe {
-                *(bytes.as_ptr() as *const [T; N])
-            })
+            result.copy_from_slice(bytes);
         } else {
-            let mut vec = Vec::with_capacity(N);
-
-            for _ in 0..N {
-                vec.push(next.from_payload::<C, T>(ctx)?);
+            for i in 0..N {
+                result[i] = next.from_payload(ctx)?;
             }
-
-            let slice = next.push_array(vec.into_boxed_slice())?;
-
-            Ok(unsafe { *(slice.as_ptr() as *const [T; N]) })
         }
+
+        Ok(result)
     }
 }
 
-impl<'a, C, T: Payload<'a, C> + AnyBox<'a>, const N: usize> Payload<'a, C> for [T; N] where T: Copy {}
+impl<'a, C, T: Payload<'a, C> + Default + 'a, const N: usize> Payload<'a, C> for [T; N] where T: Copy {}
+
+impl<C, T: IntoPayload<C>> IntoPayload<C> for Range<T> {
+    fn into_payload<'m, M: Middleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
+        next.into_payload(&self.start, ctx)?;
+        next.into_payload(&self.end, ctx)
+    }
+}
+
+impl<'a, C, T: FromPayload<'a, C>> FromPayload<'a, C> for Range<T> {
+    fn from_payload<M: Middleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
+        let start: T = next.from_payload(ctx)?;
+        let end: T = next.from_payload(ctx)?;
+
+        Ok(Range { start, end })
+    }
+}
+
+impl<'a, C, T: Payload<'a, C>> Payload<'a, C> for Range<T> {}

@@ -1,4 +1,5 @@
 use core::mem;
+use std::ops::Range;
 
 use super::{Error, AsyncMiddleware, AsyncPayload, AsyncIntoPayload, AsyncFromPayload};
 
@@ -82,28 +83,41 @@ impl<C: Send + Sync, T: AsyncIntoPayload<C>, const N: usize> AsyncIntoPayload<C>
     }
 }
 
-impl<'a, C: Send + Sync, T: AsyncFromPayload<'a, C> + 'a, const N: usize> AsyncFromPayload<'a, C> for [T; N] 
+impl<'a, C: Send + Sync, T: AsyncFromPayload<'a, C> + Default + 'a, const N: usize> AsyncFromPayload<'a, C> for [T; N] 
     where T: Copy
 {
     async fn poll_from_payload<M: AsyncMiddleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
+        let mut result = [T::default(); N];
+
         if mem::size_of::<T>() == 1 {
             let bytes: &[T] = next.poll_read(N).await?;
-
-            Ok(unsafe {
-                *(bytes.as_ptr() as *const [T; N])
-            })
+            result.copy_from_slice(bytes);
         } else {
-            let mut vec = Vec::with_capacity(N);
-
-            for _ in 0..N {
-                vec.push(next.poll_from_payload::<C, T>(ctx).await?);
+            for i in 0..N {
+                result[i] = next.poll_from_payload(ctx).await?;
             }
-
-            let slice = next.poll_push_array(vec.into_boxed_slice()).await?;
-
-            Ok(unsafe { *(slice.as_ptr() as *const [T; N]) })
         }
+
+        Ok(result)
     }
 }
 
-impl<'a, C: Send + Sync, T: AsyncPayload<'a, C>, const N: usize> AsyncPayload<'a, C> for [T; N] where T: Copy {}
+impl<'a, C: Send + Sync, T: AsyncPayload<'a, C> + Default, const N: usize> AsyncPayload<'a, C> for [T; N] where T: Copy {}
+
+impl<C: Send + Sync, T: AsyncIntoPayload<C>> AsyncIntoPayload<C> for Range<T> {
+    async fn poll_into_payload<'m, M: AsyncMiddleware<'m>>(&self, ctx: &mut C, next: &mut M) -> Result<(), Error> {
+        next.poll_into_payload(&self.start, ctx).await?;
+        next.poll_into_payload(&self.end, ctx).await
+    }
+}
+
+impl<'a, C: Send + Sync, T: AsyncFromPayload<'a, C>> AsyncFromPayload<'a, C> for Range<T> {
+    async fn poll_from_payload<M: AsyncMiddleware<'a>>(ctx: &mut C, next: &mut M) -> Result<Self, Error> {
+        let start: T = next.poll_from_payload(ctx).await?;
+        let end: T = next.poll_from_payload(ctx).await?;
+
+        Ok(Range { start, end })
+    }
+}
+
+impl<'a, C: Send + Sync, T: AsyncPayload<'a, C>> AsyncPayload<'a, C> for Range<T> {}
