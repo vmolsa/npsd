@@ -62,4 +62,5 @@
 | Instant                 | ✅   |                    | IntoPayload, `TODO`               | AsyncIntoPayload, `TODO`                         | ✅                      |
 | SystemTime              | ✅   |                    | IntoPayload, FromPayload, Payload | AsyncIntoPayload, AsyncFromPayload, AsyncPayload | ✅                      |
 | io::`Error`             | ✅   |                    | IntoPayload, FromPayload, Payload | AsyncIntoPayload, AsyncFromPayload, AsyncPayload | ✅                      |
+| Range`<T>`              | ✅   |                    | IntoPayload, FromPayload, Payload | AsyncIntoPayload, AsyncFromPayload, AsyncPayload | ✅                      |
 
