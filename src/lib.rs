@@ -193,10 +193,25 @@ pub trait Middleware<'a> {
     fn read<T>(&mut self, nbytes: usize) -> Result<&'a [T], Error>;
     fn read_mut<T>(&mut self, nbytes: usize) -> Result<&'a mut [T], Error>;
 
-    fn push<T: AnyBox<'a>>(&mut self, value: Box<T>) -> Result<&'a T, Error>;
-    fn push_mut<T: AnyBox<'a>>(&mut self, value: Box<T>) -> Result<&'a mut T, Error>;
-    fn push_array<T: AnyBox<'a>>(&mut self, values: Box<[T]>) -> Result<&'a [T], Error>;
-    fn push_array_mut<T: AnyBox<'a>>(&mut self, values: Box<[T]>) -> Result<&'a mut [T], Error>;
+    #[allow(unused)]
+    fn push<T: AnyBox<'a>>(&mut self, value: Box<T>) -> Result<&'a T, Error> {
+        return Err(Error::Stack(format!("References disabled.")));
+    }
+
+    #[allow(unused)]
+    fn push_mut<T: AnyBox<'a>>(&mut self, value: Box<T>) -> Result<&'a mut T, Error> {
+        return Err(Error::Stack(format!("References disabled.")));
+    }
+
+    #[allow(unused)]
+    fn push_array<T: AnyBox<'a>>(&mut self, values: Box<[T]>) -> Result<&'a [T], Error> {
+        return Err(Error::Stack(format!("References disabled.")));
+    }
+
+    #[allow(unused)]
+    fn push_array_mut<T: AnyBox<'a>>(&mut self, values: Box<[T]>) -> Result<&'a mut [T], Error> {
+        return Err(Error::Stack(format!("References disabled.")));
+    }
 }
 
 /// The `AsyncMiddleware` trait defines asynchronous methods for converting types to and from payloads of bytes.
@@ -229,10 +244,33 @@ pub trait AsyncMiddleware<'a>: Send + Sync {
     fn poll_read<T: 'a>(&mut self, nbytes: usize) -> impl Future<Output = Result<&'a [T], Error>>;
     fn poll_read_mut<T: 'a>(&mut self, nbytes: usize) -> impl Future<Output = Result<&'a mut [T], Error>>;
 
-    fn poll_push<T: AnyBox<'a>>(&mut self, value: Box<T>) -> impl Future<Output = Result<&'a T, Error>>;
-    fn poll_push_mut<T: AnyBox<'a>>(&mut self, value: Box<T>) -> impl Future<Output = Result<&'a mut T, Error>>;
-    fn poll_push_array<T: AnyBox<'a>>(&mut self, values: Box<[T]>) -> impl Future<Output = Result<&'a [T], Error>>;
-    fn poll_push_array_mut<T: AnyBox<'a>>(&mut self, values: Box<[T]>) -> impl Future<Output = Result<&'a mut [T], Error>>;
+    #[allow(unused)]
+    fn poll_push<T: AnyBox<'a>>(&mut self, value: Box<T>) -> impl Future<Output = Result<&'a T, Error>> {
+        async move {
+            return Err(Error::Stack(format!("References disabled.")));
+        }
+    }
+
+    #[allow(unused)]
+    fn poll_push_mut<T: AnyBox<'a>>(&mut self, value: Box<T>) -> impl Future<Output = Result<&'a mut T, Error>> {
+        async move {
+            return Err(Error::Stack(format!("References disabled.")));
+        }
+    }
+
+    #[allow(unused)]
+    fn poll_push_array<T: AnyBox<'a>>(&mut self, values: Box<[T]>) -> impl Future<Output = Result<&'a [T], Error>> {
+        async move {
+            return Err(Error::Stack(format!("References disabled.")));
+        }
+    }
+
+    #[allow(unused)]
+    fn poll_push_array_mut<T: AnyBox<'a>>(&mut self, values: Box<[T]>) -> impl Future<Output = Result<&'a mut [T], Error>> {
+        async move {
+            return Err(Error::Stack(format!("References disabled.")));
+        }
+    }
 }
 
 /// The `IntoPayload` trait is used to convert a type into a payload of bytes.
