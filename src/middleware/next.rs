@@ -98,30 +98,6 @@ impl<'a> Middleware<'a> for Next<'a> {
     fn push_array_mut<T: AnyBox<'a>>(&mut self, values: Box<[T]>) -> Result<&'a mut [T], Error> {
         Ok(self.stack.push_array_mut(values))
     }
-
-    #[cfg(not(feature = "crossbeam"))]
-    #[inline(always)]
-    fn push<T: AnyBox<'a>>(&mut self, _value: Box<T>) -> Result<&'a T, Error> {
-        Err(Error::Stack("References disabled".to_string()))
-    }
-
-    #[cfg(not(feature = "crossbeam"))]
-    #[inline(always)]
-    fn push_mut<T: AnyBox<'a>>(&mut self, _value: Box<T>) -> Result<&'a mut T, Error> {
-        Err(Error::Stack("References disabled".to_string()))
-    }
-
-    #[cfg(not(feature = "crossbeam"))]
-    #[inline(always)]
-    fn push_array<T: AnyBox<'a>>(&mut self, _values: Box<[T]>) -> Result<&'a [T], Error> {
-        Err(Error::Stack("References disabled".to_string()))
-    }
-
-    #[cfg(not(feature = "crossbeam"))]
-    #[inline(always)]
-    fn push_array_mut<T: AnyBox<'a>>(&mut self, _values: Box<[T]>) -> Result<&'a mut [T], Error> {
-        Err(Error::Stack("References disabled".to_string()))
-    }
 }
 
 /// # AsyncMiddleware Methods
@@ -208,30 +184,6 @@ impl<'a> AsyncMiddleware<'a> for Next<'a> {
     #[inline(always)]
     async fn poll_push_array_mut<T: AnyBox<'a>>(&mut self, values: Box<[T]>) -> Result<&'a mut [T], Error> {
         Ok(self.stack.push_array_mut(values))
-    }
-
-    #[cfg(not(feature = "crossbeam"))]
-    #[inline(always)]
-    async fn poll_push<T: AnyBox<'a>>(&mut self, _value: Box<T>) -> Result<&'a T, Error> {
-        Err(Error::Stack("References disabled".to_string()))
-    }
-
-    #[cfg(not(feature = "crossbeam"))]
-    #[inline(always)]
-    async fn poll_push_mut<T: AnyBox<'a>>(&mut self, _value: Box<T>) -> Result<&'a mut T, Error> {
-        Err(Error::Stack("References disabled".to_string()))
-    }
-
-    #[cfg(not(feature = "crossbeam"))]
-    #[inline(always)]
-    async fn poll_push_array<T: AnyBox<'a>>(&mut self, _values: Box<[T]>) -> Result<&'a [T], Error> {
-        Err(Error::Stack("References disabled".to_string()))
-    }
-
-    #[cfg(not(feature = "crossbeam"))]
-    #[inline(always)]
-    async fn poll_push_array_mut<T: AnyBox<'a>>(&mut self, _values: Box<[T]>) -> Result<&'a mut [T], Error> {
-        Err(Error::Stack("References disabled".to_string()))
     }
 }
 
@@ -553,30 +505,6 @@ impl<'a> Middleware<'a> for NextTrace<'a> {
     fn push_array_mut<T: AnyBox<'a>>(&mut self, values: Box<[T]>) -> Result<&'a mut [T], Error> {
         Ok(self.stack.push_array_mut(values))
     }
-
-    #[cfg(not(feature = "crossbeam"))]
-    #[inline(always)]
-    fn push<T: AnyBox<'a>>(&mut self, _value: Box<T>) -> Result<&'a T, Error> {
-        Err(Error::Stack("References disabled".to_string()))
-    }
-
-    #[cfg(not(feature = "crossbeam"))]
-    #[inline(always)]
-    fn push_mut<T: AnyBox<'a>>(&mut self, _value: Box<T>) -> Result<&'a mut T, Error> {
-        Err(Error::Stack("References disabled".to_string()))
-    }
-
-    #[cfg(not(feature = "crossbeam"))]
-    #[inline(always)]
-    fn push_array<T: AnyBox<'a>>(&mut self, _values: Box<[T]>) -> Result<&'a [T], Error> {
-        Err(Error::Stack("References disabled".to_string()))
-    }
-
-    #[cfg(not(feature = "crossbeam"))]
-    #[inline(always)]
-    fn push_array_mut<T: AnyBox<'a>>(&mut self, _values: Box<[T]>) -> Result<&'a mut [T], Error> {
-        Err(Error::Stack("References disabled".to_string()))
-    }
 }
 
 #[cfg(feature = "info")]
@@ -680,29 +608,5 @@ impl<'a> AsyncMiddleware<'a> for NextTrace<'a> {
     #[inline(always)]
     async fn poll_push_array_mut<T: AnyBox<'a>>(&mut self, values: Box<[T]>) -> Result<&'a mut [T], Error> {
         Ok(self.stack.push_array_mut(values))
-    }
-
-    #[cfg(not(feature = "crossbeam"))]
-    #[inline(always)]
-    async fn poll_push<T: AnyBox<'a>>(&mut self, _value: Box<T>) -> Result<&'a T, Error> {
-        Err(Error::Stack("References disabled".to_string()))
-    }
-
-    #[cfg(not(feature = "crossbeam"))]
-    #[inline(always)]
-    async fn poll_push_mut<T: AnyBox<'a>>(&mut self, _value: Box<T>) -> Result<&'a mut T, Error> {
-        Err(Error::Stack("References disabled".to_string()))
-    }
-
-    #[cfg(not(feature = "crossbeam"))]
-    #[inline(always)]
-    async fn poll_push_array<T: AnyBox<'a>>(&mut self, _values: Box<[T]>) -> Result<&'a [T], Error> {
-        Err(Error::Stack("References disabled".to_string()))
-    }
-
-    #[cfg(not(feature = "crossbeam"))]
-    #[inline(always)]
-    async fn poll_push_array_mut<T: AnyBox<'a>>(&mut self, _values: Box<[T]>) -> Result<&'a mut [T], Error> {
-        Err(Error::Stack("References disabled".to_string()))
     }
 }
