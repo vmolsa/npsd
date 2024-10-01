@@ -2,7 +2,6 @@
 use core::borrow::{Borrow, BorrowMut};
 
 use crate::AnyBox;
-
 use super::{Error, Middleware, Payload, IntoPayload, FromPayload};
 
 impl<'a, C, T: IntoPayload<C>> IntoPayload<C> for &'a T {
