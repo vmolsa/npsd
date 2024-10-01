@@ -57,7 +57,7 @@ impl<'a, C, T: FromPayload<'a, C> + AnyBox<'a>> FromPayload<'a, C> for &'a mut [
             next.read_mut(nbytes)
         } else {
             let vec: Vec<T> = next.from_payload(ctx)?;
-
+            
             next.push_array_mut(vec.into_boxed_slice())
         }
     }
