@@ -31,6 +31,9 @@ pub enum Error {
         found: usize,
     },
 
+    #[error("Allocation failed `{0}`")]
+    AllocationFailure(String),
+
     #[error("Stack error: `{0}`")]
     Stack(String),
 
