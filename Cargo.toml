@@ -30,6 +30,10 @@ async = []
 info = []
 full = [ "crossbeam", "sync", "async", "info", "uuid", "fxhash", "chrono" ]
 
+# for future purpose
+io_error_more = []
+io_error_uncategorized = []
+
 [dev-dependencies]
 pretty-hex = "0.4.1"
 serde = { version = "1.0.203", features = ["derive"] }
